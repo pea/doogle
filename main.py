@@ -79,7 +79,8 @@ def process_recording(stopped, q):
         print(llama_response_text)
         text_to_speech(llama_response_text)
 
-        os.remove('./recording2.tmp.wav')
+        if os.path.exists('./recording2.tmp.wav'):
+          os.remove('./recording2.tmp.wav')
         
         stream = wave.open('recording2.wav', 'wb')
         stream.setnchannels(1)
@@ -124,7 +125,10 @@ def record(stopped, q):
           should_record = True
           
         if should_record:
-          stream.writeframes(chunk)
+          try:
+            stream.writeframes(chunk)
+          except:
+            pass
 
         if (vol < MIN_VOLUME):
           seconds_silent += CHUNK_SIZE / RATE
@@ -141,7 +145,7 @@ def record(stopped, q):
           if os.path.exists('./recording2.wav'):
             shutil.copy2('./recording2.wav', './recording2.tmp.wav')
 
-        if (seconds_silent > 10 and activated):
+        if (seconds_silent > 60 and activated):
           print("Closing session")
           activated = False
           prompt = ""
@@ -189,9 +193,6 @@ def speech_to_text_request():
   text = text.strip()
   text = text.replace("\n", "")  # Remove all new lines
   text = text.replace("[BLANK_AUDIO]", "")  # Remove all occurrences of [BLANK_AUDIO]
-
-  if text == "":
-    return None
 
   return text
 
