@@ -112,7 +112,7 @@ def record(stopped, q):
         score = prediction[model_name]
 
         if (score >= 0.5 and not should_record):
-            # print("Wake word detected")
+            print("Wake word detected")
             should_record = True
             activated = True
 
@@ -120,7 +120,7 @@ def record(stopped, q):
         vol = max(chunk)
         
         if (activated and vol >= MIN_VOLUME):
-          # print("Started recording")
+          print("Started recording")
           should_record = True
           
         if should_record:
@@ -134,17 +134,24 @@ def record(stopped, q):
           seconds_non_silent += CHUNK_SIZE / RATE
 
         if (should_record and (seconds_silent > 2 or seconds_non_silent > 10)):
-          # print("Stopped recording")
+          print("Stopped recording")
           should_record = False
           seconds_silent = 0
 
           if os.path.exists('./recording2.wav'):
             shutil.copy2('./recording2.wav', './recording2.tmp.wav')
 
-        if (seconds_silent > 10):
-          # print("Closing session")
+        if (seconds_silent > 10 and activated):
+          print("Closing session")
           activated = False
           prompt = ""
+          stream = wave.open('recording2.wav', 'wb')
+          stream.setnchannels(1)
+          stream.setsampwidth(pyaudio.get_sample_size(pyaudio.paInt16))
+          stream.setframerate(RATE)
+          stream.close() 
+          if os.path.exists('./recording2.tmp.wav'):
+            os.remove('./recording2.tmp.wav')
 
 def listen(stopped, q):
     stream = pyaudio.PyAudio().open(
