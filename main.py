@@ -21,6 +21,7 @@ RATE = 16000
 
 prompt = ""
 prompt_lock = threading.Lock()
+is_playing = False
 
 def main():
 
@@ -60,9 +61,18 @@ def process_recording(stopped, q):
         if not os.path.exists('./recording2.tmp.wav'):
           continue
 
-        print("Requesting speech to text")
+        if is_playing:
+          continue
+
+        # print("Requesting speech to text")
         text = speech_to_text_request()
-        print(text)
+
+        text = text.strip()
+        text = text.replace("\n", "")  # Remove all new lines
+        text = text.replace("[BLANK_AUDIO]", "")  # Remove all occurrences of [BLANK_AUDIO]
+
+        if text == "":
+          continue
 
         llama_response = llama_request(text)
         llama_response_text = concat_llama_response_text(llama_response)
@@ -78,6 +88,8 @@ def process_recording(stopped, q):
         stream.close()  
 
 def record(stopped, q):
+    global prompt
+
     audio = pyaudio.PyAudio()
     mic_stream = audio.open(format=pyaudio.paInt16, channels=1, rate=RATE, input=True, frames_per_buffer=CHUNK_SIZE)
 
@@ -88,7 +100,9 @@ def record(stopped, q):
     stream.setsampwidth(pyaudio.get_sample_size(pyaudio.paInt16))
     stream.setframerate(RATE)
     seconds_silent = 0
+    seconds_non_silent = 0
     should_record = False
+    activated = False
 
     while True:
         if stopped.wait(timeout=0):
@@ -97,11 +111,16 @@ def record(stopped, q):
         model_name = list(owwModel.models.keys())[0]
         score = prediction[model_name]
 
+        if (score >= 0.5 and not should_record):
+            # print("Wake word detected")
+            should_record = True
+            activated = True
+
         chunk = q.get()
         vol = max(chunk)
         
-        if (score >= 0.5):
-          print("Started recording")
+        if (activated and vol >= MIN_VOLUME):
+          # print("Started recording")
           should_record = True
           
         if should_record:
@@ -109,16 +128,23 @@ def record(stopped, q):
 
         if (vol < MIN_VOLUME):
           seconds_silent += CHUNK_SIZE / RATE
+          seconds_non_silent = 0
         else:
           seconds_silent = 0
+          seconds_non_silent += CHUNK_SIZE / RATE
 
-        if (should_record and seconds_silent > 2):
-          print("Stopped recording")
+        if (should_record and (seconds_silent > 2 or seconds_non_silent > 10)):
+          # print("Stopped recording")
           should_record = False
           seconds_silent = 0
 
           if os.path.exists('./recording2.wav'):
             shutil.copy2('./recording2.wav', './recording2.tmp.wav')
+
+        if (seconds_silent > 10):
+          # print("Closing session")
+          activated = False
+          prompt = ""
 
 def listen(stopped, q):
     stream = pyaudio.PyAudio().open(
@@ -150,7 +176,17 @@ def speech_to_text_request():
   response_json = response.json()
   if 'text' not in response_json:
     return ""
-  return response_json['text']
+  
+  text = response_json['text']
+  
+  text = text.strip()
+  text = text.replace("\n", "")  # Remove all new lines
+  text = text.replace("[BLANK_AUDIO]", "")  # Remove all occurrences of [BLANK_AUDIO]
+
+  if text == "":
+    return None
+
+  return text
 
 def display_llama_response(r1):
   data1 = r1.read()  # This will return entire content.
@@ -196,10 +232,10 @@ def llama_request(text):
 
   if prompt == '':
     with prompt_lock:
-      prompt = 'User: ' + text + '\nDoogle:'
+      prompt = 'This is a chat between a user and a home assistant called Doogle. Doogle does not pretend. Doogle does not use emojis or emoticons. User: ' + text + '\nDoogle:'
   else:
     with prompt_lock:
-      prompt = prompt + 'User: ' + text + '\nDoogle:'
+      prompt = prompt + ' User: ' + text + '\nDoogle:'
 
   print(prompt)
 
@@ -238,6 +274,8 @@ def llama_request(text):
   return conn.getresponse()
 
 def text_to_speech(text):
+  global is_playing
+  is_playing = True
   url = 'http://192.168.1.131:5002/api/tts'
   params = {
     'text': text,
@@ -248,6 +286,8 @@ def text_to_speech(text):
   response = requests.get(url, params=params, headers=None, verify=False)
 
   subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=response.content, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+  is_playing = False
 
 if __name__ == '__main__':
     main()
