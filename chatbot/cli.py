@@ -1,7 +1,7 @@
 import requests
 import time
 
-history = "This is a chat between a user and a home assistant called Doogle. Doogle does not pretend. Doogle does not use emojis or emoticons. Doogle keeps replies as short as possible."
+history = "This is a chat between a user and a home assistant called Doogle. Doogle does not pretend. Doogle does not use emojis or emoticons."
 
 while True:
     userText = input("\033[32mYou:\033[0m ")

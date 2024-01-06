@@ -2,3 +2,4 @@ pyaudio
 requests
 numpy
 openwakeword
+portaudio19-dev

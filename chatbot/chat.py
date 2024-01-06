@@ -12,6 +12,7 @@ import os
 import shutil
 import requests
 import base64
+import time
 
 CHUNK_SIZE = 1024
 BUF_MAX_SIZE = CHUNK_SIZE * 10
@@ -20,6 +21,7 @@ RATE = 16000
 is_playing = False
 last_response_timestamp = 0
 volume_history = np.array([])
+is_processing = False
 
 history = "This is a chat between a user and a home assistant called Doogle. Doogle does not pretend. Doogle does not use emojis or emoticons. Doogle keeps replies as short as possible."
 
@@ -55,6 +57,8 @@ def main():
 def process_recording(stopped, q):
     global last_response_timestamp
     global history
+    global is_playing
+    global is_processing
 
     while True:
         if stopped.wait(timeout=0):
@@ -65,6 +69,8 @@ def process_recording(stopped, q):
 
         if is_playing:
           continue
+
+        is_processing = True
 
         files = {
           'audio': open('recording.wav', 'rb')
@@ -89,14 +95,18 @@ def process_recording(stopped, q):
         wavData = response_json['wavData']
         wavDataBytes = base64.b64decode(wavData)
 
-        print("User: " + sttText)
-        print("Doogle: " + llamaText)
+        
+        print('\r' + "\033[32mUser:\033[0m " + sttText)
+        print('\r' + "\033[34mDoogle:\033[0m " + llamaText)
 
         history += "\n\nUser: " + sttText + "\nDoogle: " + llamaText
 
-        # print(history)
+        is_playing = True
+        is_processing = False
 
         subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=wavDataBytes, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        is_playing = False
 
         if os.path.exists('./recording.tmp.wav'):
           os.remove('./recording.tmp.wav')
@@ -111,6 +121,8 @@ def process_recording(stopped, q):
 def record(stopped, q):
     global last_response_timestamp
     global volume_history
+    global is_processing
+    global is_playing
 
     audio = pyaudio.PyAudio()
     mic_stream = audio.open(format=pyaudio.paInt16, channels=1, rate=RATE, input=True, frames_per_buffer=CHUNK_SIZE)
@@ -125,6 +137,7 @@ def record(stopped, q):
     should_record = False
     activated = False
     time_started_recording = 0
+    max_volume = 0
 
     while True:
         if stopped.wait(timeout=0):
@@ -141,7 +154,9 @@ def record(stopped, q):
         if len(volume_history) > 100:
           volume_history = volume_history[1:]     
 
+        max_volume = max(max_volume, vol)
         base_volume = get_baseline_volume()
+        sound_bars = volume_to_bars(vol / max_volume)
 
         # Check for wake word if not already recording
         if (score >= 0.5 and not should_record):
@@ -188,10 +203,25 @@ def record(stopped, q):
           if os.path.exists('./recording.wav'):
             shutil.copy2('./recording.wav', './recording.tmp.wav')
 
+        status = ''
+
         if should_record:
-          print(f'\rRecording: Yes', end='')
+            status = 'Listening' + ' ' + sound_bars
         else:
-          print(f'\rRecording: No', end='')
+          if is_processing:
+            status = 'Waiting for reply...'
+
+        print(f'\r{"".ljust(40)}', end='')
+        print(f'\r{status}', end='')
+
+def volume_to_bars(vol_percent_increase, scale=30):
+  # Convert the volume percentage increase to an integer
+  vol_int = int(vol_percent_increase * scale)
+
+  # Create a string of ▓ and ░ characters
+  bars = '▓' * vol_int + '░' * (scale - vol_int)
+
+  return bars
 
 def listen(stopped, q):
     stream = pyaudio.PyAudio().open(
@@ -232,15 +262,6 @@ def get_baseline_volume():
   rounded_mean = round(mean)
 
   return rounded_mean
-
-def volume_to_bars(vol_percent_increase, scale=10):
-    # Convert the volume percentage increase to an integer
-    vol_int = int(vol_percent_increase * scale)
-
-    # Create a string of | and - characters
-    bars = '|' * vol_int + '-' * (scale - vol_int)
-
-    return bars
 
 if __name__ == '__main__':
     main()
