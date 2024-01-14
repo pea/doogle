@@ -1,0 +1,20 @@
+{
+  "name": "ebs-test-site",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "zip": "zip -r ../ebs-test-site.zip . -x \"node_modules/*\" \"*.git*\" \"*.zip\" \"docker-compose.yml\""
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@intrinsicai/gbnfgen": "^0.10.0",
+    "axios": "^1.6.3",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "type": "module"
+}

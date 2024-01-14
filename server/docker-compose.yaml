@@ -1,0 +1,59 @@
+services:
+  api:
+    build:
+      context: '.'
+      dockerfile: 'api.Dockerfile'
+    ports:
+      - '4000:4000'
+    restart: 'always'
+
+  llamacpp:
+    restart: 'always'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: 'nvidia'
+              count: 'all'
+              capabilities:
+                - 'gpu'
+    volumes:
+      - './models:/models'
+    build:
+      context: '.'
+      dockerfile: 'llamaCpp.Dockerfile'
+    ports:
+      - '7000:7000'
+    command: '--server -m /models/llama-2-7b-chat.Q6_K.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
+
+  whisper:
+    build:
+      context: '.'
+      dockerfile: 'whisperCpp.Dockerfile'
+    ports:
+      - '6060:8080'
+    restart: 'always'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: 'nvidia'
+              count: 'all'
+              capabilities:
+                - 'gpu'
+
+  tts:
+    build:
+      context: '.'
+      dockerfile: 'tss.Dockerfile'
+    ports:
+      - '5002:5002'
+    restart: 'always'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: 'nvidia'
+              count: 'all'
+              capabilities:
+                - 'gpu'

@@ -1,0 +1,5 @@
+.DS_Store
+recording.wav
+recording.tmp.wav
+__pycache__/
+node_modules/
