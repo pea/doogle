@@ -2,3 +2,4 @@ pyaudio
 requests
 numpy
 openwakeword
+rpi_rf

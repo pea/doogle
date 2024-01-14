@@ -25,6 +25,7 @@ functions_json_file = os.path.join(base_dir, 'functions.json')
 CHUNK_SIZE = 1024
 BUF_MAX_SIZE = CHUNK_SIZE * 10
 RATE = 16000
+INPUT_DEVICE_INDEX = 0 # Replace with the index of your desired input device
 
 is_playing = False
 last_response_timestamp = 0
@@ -140,7 +141,7 @@ def process_recording(stopped, q):
         if response.status_code == 200:
           last_response_timestamp = time.time()
         else:
-          print('\r' + "\033[31mError:\033[0m " + "Something went wrong. + " + str(response.status_code) + ": " + response.text)
+          print('\r' + "\033[31mError:\033[0m " + "Something went wrong. + " + str(response.status_code)": " + response.text)
           if os.path.exists('./recording.tmp.wav'):
             os.remove('./recording.tmp.wav')
           continue
@@ -183,7 +184,33 @@ def process_recording(stopped, q):
           is_processing = False
           is_playing = False
           continue
-        
+
+def play_audio(file_path):
+    # If the function is being called from the main thread,
+    # create a new thread and start it
+    if threading.current_thread() == threading.main_thread():
+        audio_thread = threading.Thread(target=play_audio, args=(file_path,))
+        audio_thread.start()
+        return
+
+    # Prepend the absolute path
+    abs_file_path = os.path.abspath(file_path)
+
+    ffmpeg = subprocess.Popen(
+        ["ffmpeg", "-i", abs_file_path, "-f", "wav", "-"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+
+    aplay = subprocess.Popen(
+        ["aplay", "-D", "default"],
+        stdin=ffmpeg.stdout,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    ffmpeg.stdout.close()  # Allow ffmpeg to receive a SIGPIPE if aplay exits.
+    output, _ = aplay.communicate()
 
 def record(stopped, q):
     global last_response_timestamp
@@ -193,12 +220,13 @@ def record(stopped, q):
 
     audio = pyaudio.PyAudio()
     mic_stream = audio.open(
-       format=pyaudio.paInt16, 
-       channels=1, 
-       rate=RATE, 
-       input=True, 
-       frames_per_buffer=CHUNK_SIZE
-       )
+      format=pyaudio.paInt16, 
+      channels=1, 
+      rate=RATE, 
+      input=True, 
+      frames_per_buffer=CHUNK_SIZE,
+      input_device_index=INPUT_DEVICE_INDEX
+    )
     
     owwModel = Model(wakeword_models=[os.path.join(base_dir, 'models/hey_doogle.tflite')], inference_framework="tflite")
 
@@ -212,10 +240,7 @@ def record(stopped, q):
     time_started_recording = 0
     max_volume = 0
 
-    def play_sound():
-      subprocess.run(["ffplay", "-nodisp", "-autoexit", "start.wav"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    sound_thread = threading.Thread(target=play_sound)
-    sound_thread.start()
+    play_audio('start.wav')
 
     while True:
         if stopped.wait(timeout=0):
@@ -239,12 +264,7 @@ def record(stopped, q):
         # Check for wake word if not already recording
         if (score >= 0.5 and not should_record):
             # print("Wake word detected")
-            
-            def play_sound():
-              subprocess.run(["ffplay", "-nodisp", "-autoexit", "open.wav"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            sound_thread = threading.Thread(target=play_sound)
-            sound_thread.start()
-            
+            play_audio('open.wav')
             activated = True
             should_record = True
     
@@ -269,12 +289,7 @@ def record(stopped, q):
         # Stop recording if silent for 2 seconds
         if (should_record and seconds_silent > 2):
           # print("Stopped recording")
-          
-          def play_sound():
-            subprocess.run(["ffplay", "-nodisp", "-autoexit", "close.wav"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-          sound_thread = threading.Thread(target=play_sound)
-          sound_thread.start()
-
+          play_audio('close.wav')
           should_record = False
           seconds_silent = 0
           activated = False
@@ -285,12 +300,7 @@ def record(stopped, q):
 
         # Stop recording if 10 seconds have passed since started recording
         if (activated and (time_started_recording + 10 < time.time() and time_started_recording != 0)):
-          
-          def play_sound():
-            subprocess.run(["ffplay", "-nodisp", "-autoexit", "close.wav"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-          sound_thread = threading.Thread(target=play_sound)
-          sound_thread.start()
-
+          play_audio('close.wav')
           should_record = False
           seconds_silent = 0
           activated = False
@@ -326,6 +336,7 @@ def listen(stopped, q):
         rate=RATE,
         input=True,
         frames_per_buffer=1024,
+        input_device_index=INPUT_DEVICE_INDEX
     )
 
     while True:
