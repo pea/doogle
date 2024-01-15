@@ -17,8 +17,6 @@ services:
               count: 'all'
               capabilities:
                 - 'gpu'
-    volumes:
-      - './models:/models'
     build:
       context: '.'
       dockerfile: 'llamaCpp.Dockerfile'

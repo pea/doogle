@@ -14,13 +14,9 @@ const upload = multer({ storage: storage }).single('audio');
 app.post('/message', async (req, res) => {
   const history = req.body?.history;
   const text = req.body?.text;
-  const functions = req.body?.functions;
+  const grammarTypescript = req.body?.grammar;
 
-  const grammar = serializeGrammar(await compile(
-    `interface Response {
-        message: string;
-        ${functions ?? ''}
-    }`, "Response"))
+  const grammar = serializeGrammar(await compile(grammarTypescript, "Response"))
 
   try {
     const llamaText = await llamaRequest({text, history, grammar});
@@ -41,13 +37,9 @@ app.post('/message', async (req, res) => {
 app.post('/chat', upload, async (req, res) => {
   const file = req.file;
   const history = req.body.history;
-  const functions = req.body.functions;
+  const grammarTypescript = req.body.grammar;
 
-  const grammar = serializeGrammar(await compile(
-    `interface Response {
-        message: string;
-        ${functions ?? ''}
-    }`, "Response"))
+  const grammar = serializeGrammar(await compile(grammarTypescript, "Response"))
 
   if (!file) {
     return res.status(400).send('No file uploaded.');
@@ -90,7 +82,7 @@ app.post('/chat', upload, async (req, res) => {
     }
 
     const llamaTextJson = await getLlamaText();
-
+    
     if (!llamaTextJson) {
       res.status(500).send('Invalid response from Doogle');
       return;

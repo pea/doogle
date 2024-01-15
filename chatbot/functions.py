@@ -6,18 +6,47 @@ import os
 base_dir = os.path.dirname(os.path.abspath(__file__))
 functions_json_file = os.path.join(base_dir, 'functions.json')
 
-def run_functions(json_text):
-  json_without_message = json_text.copy()
-  del json_without_message['message']
+def run_function(function_name):
+  if function_name == "none":
+    return
 
-  try:
-    with open(functions_json_file) as f:
+  with open(functions_json_file) as f:
       data = json.load(f)
 
-    for function, details in data.items():
-      if function in json_text:
-        if json_text[function] == True:
-          subprocess.run(details['command'], shell=True)
-          print(f'Running {function} function')
-  except:
-    return
+  if function_name in data:
+    function = data[function_name]
+    subprocess.run(function['command'], shell=True)
+  
+def functions_prompt():
+  with open(functions_json_file) as f:
+      data = json.load(f)
+
+  sentences = []
+
+  for function, details in data.items():
+      function_json_string = '{"function": "' + function + '"}'
+      sentence = f'{details["prompt"].replace("[function]", function_json_string)}'
+      sentences.append(sentence + " by setting function to " + function)
+
+  result = ', '.join(sentences)
+
+  return result
+
+def grammar_types():
+  with open(functions_json_file) as f:
+    data = json.load(f)
+
+    enum_string = "enum Functions {\n"
+    enum_string += "  None = \"None\",\n"
+    for function in data.keys():
+        enum_string += f"  {function} = \"{function}\",\n"
+    enum_string += "}\n"
+
+    interface_string = """
+interface Response {
+  message: string;
+  function: Functions;
+}
+"""
+
+    return enum_string + interface_string

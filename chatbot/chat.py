@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/doogle/doogle/chatbot/.venv/bin/python3
 
 import threading
 from array import array
@@ -15,7 +15,9 @@ import shutil
 import requests
 import base64
 import time
-from functions import run_functions
+from functions import run_function
+from functions import functions_prompt
+from functions import grammar_types
 import threading
 import json
 
@@ -25,58 +27,14 @@ functions_json_file = os.path.join(base_dir, 'functions.json')
 CHUNK_SIZE = 1024
 BUF_MAX_SIZE = CHUNK_SIZE * 10
 RATE = 16000
-INPUT_DEVICE_INDEX = 0 # Replace with the index of your desired input device
+INPUT_DEVICE_INDEX = 3
 
 is_playing = False
 last_response_timestamp = 0
 volume_history = np.array([])
 is_processing = False
 
-def functions_prompt():
-  with open(functions_json_file) as f:
-      data = json.load(f)
-
-  sentences = []
-
-  for function, details in data.items():
-      function_json_string = '{"function": "' + function + '"}'
-      sentence = f'{details["prompt"].replace("[function]", function_json_string)}'
-      sentences.append(sentence)
-
-  result = ', '.join(sentences)
-
-  return result
-
-def functions_defaults_prompt():
-  with open(functions_json_file) as f:
-      data = json.load(f)
-
-  sentences = []
-
-  for function, details in data.items():
-      function_json_string = '{"function": "' + function + '"}'
-      sentence = function + " is false by default"
-      sentences.append(sentence)
-
-  result = ', '.join(sentences)
-
-  return result
-
-def functions_types():
-  with open(functions_json_file) as f:
-    data = json.load(f)
-
-  function_types = []
-
-  for function, details in data.items():
-    function_type = f'{function}: boolean'
-    function_types.append(function_type)
-
-  result = '; '.join(function_types)
-
-  return result
-
-history = "This is a chat between a user and a home assistant called Doogle. Doogle does not pretend. Doogle does not use emojis or emoticons. Doogle can do the following functions: " + functions_prompt() + ". " + functions_defaults_prompt()
+history = "This is a chat between a user and a home assistant called Doogle. Doogle does not pretend. Doogle does not use emojis or emoticons. Doogle can do the following functions: " + functions_prompt() + ". function is none by default"
 
 print(history)
 
@@ -109,6 +67,15 @@ def main():
     record_t.join()
     process_recording_t.join()
 
+def play_audio(input):
+  def play():
+    if os.path.exists(input):
+      subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+       subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+      
+  threading.Thread(target=play).start()
+
 def process_recording(stopped, q):
     global last_response_timestamp
     global history
@@ -133,7 +100,7 @@ def process_recording(stopped, q):
 
         data = {
           'history': history,
-          'functions': functions_types()
+          'grammar': grammar_types()
         }
 
         response = requests.post('http://192.168.1.131:4000/chat', headers=None, files=files, data=data)
@@ -141,7 +108,7 @@ def process_recording(stopped, q):
         if response.status_code == 200:
           last_response_timestamp = time.time()
         else:
-          print('\r' + "\033[31mError:\033[0m " + "Something went wrong. + " + str(response.status_code)": " + response.text)
+          print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
           if os.path.exists('./recording.tmp.wav'):
             os.remove('./recording.tmp.wav')
           continue
@@ -155,7 +122,7 @@ def process_recording(stopped, q):
           wavData = response_json['wavData']
           wavDataBytes = base64.b64decode(wavData)
 
-          run_functions(llamaText_json)
+          run_function(llamaText_json['function'])
           
           print('\r' + "\033[32mUser:\033[0m " + sttText)
           print('\r' + "\033[34mDoogle:\033[0m " + message)
@@ -165,7 +132,7 @@ def process_recording(stopped, q):
           is_playing = True
           is_processing = False
 
-          subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=wavDataBytes, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+          play_audio(wavDataBytes)
 
           is_playing = False
 
@@ -184,33 +151,6 @@ def process_recording(stopped, q):
           is_processing = False
           is_playing = False
           continue
-
-def play_audio(file_path):
-    # If the function is being called from the main thread,
-    # create a new thread and start it
-    if threading.current_thread() == threading.main_thread():
-        audio_thread = threading.Thread(target=play_audio, args=(file_path,))
-        audio_thread.start()
-        return
-
-    # Prepend the absolute path
-    abs_file_path = os.path.abspath(file_path)
-
-    ffmpeg = subprocess.Popen(
-        ["ffmpeg", "-i", abs_file_path, "-f", "wav", "-"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-    )
-
-    aplay = subprocess.Popen(
-        ["aplay", "-D", "default"],
-        stdin=ffmpeg.stdout,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
-    ffmpeg.stdout.close()  # Allow ffmpeg to receive a SIGPIPE if aplay exits.
-    output, _ = aplay.communicate()
 
 def record(stopped, q):
     global last_response_timestamp
