@@ -92,10 +92,6 @@ To add a function, add a new item to the functions.json file. The prompt tells D
 
 Llama 2 refuses to play radio stations due to "ethical reasons". So you'll have to use a different model to do it, such as [WizardLM-1.0-Uncensored-Llama2-13B-GGUF](https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGUF).
 
-## Running on MacOS vs running on Raspberry Pi
-
-The chatbot has been tested on MacOS and Raspberry Pi, but the only thing that's different is the input audio device index that needs changing in `chat.py`. On MacOS, the input device index is 0, and on Raspberry Pi it's 3. If you're using a different OS, you'll need to find the input device index for your system. You can use `arecord -l` on the Raspberry Pi to find the input device index.
-
 ## Volume
 
 You might want to increase the mic gain and speaker volume on the Raspberry Pi. You can do this by running `alsamixer`.

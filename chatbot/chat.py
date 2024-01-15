@@ -27,7 +27,6 @@ functions_json_file = os.path.join(base_dir, 'functions.json')
 CHUNK_SIZE = 1024
 BUF_MAX_SIZE = CHUNK_SIZE * 10
 RATE = 16000
-INPUT_DEVICE_INDEX = 3
 
 is_playing = False
 last_response_timestamp = 0
@@ -42,9 +41,6 @@ def main():
     stopped = threading.Event()
     q = queue.Queue(maxsize=int(round(BUF_MAX_SIZE / CHUNK_SIZE)))
 
-    if os.path.exists('./recording.tmp.wav'):
-      os.remove('./recording.tmp.wav')
-
     if os.path.exists('./recording.wav'):
       os.remove('./recording.wav')
 
@@ -52,20 +48,16 @@ def main():
     listen_t.start()
     record_t = threading.Thread(target=record, args=(stopped, q))
     record_t.start()
-    process_recording_t = threading.Thread(target=process_recording, args=(stopped, q))
-    process_recording_t.start()
 
     try:
         while True:
             listen_t.join(0.1)
             record_t.join(0.1)
-            process_recording_t.join(0.1)
     except KeyboardInterrupt:
         stopped.set()
 
     listen_t.join()
     record_t.join()
-    process_recording_t.join()
 
 def play_audio(input):
   def play():
@@ -76,26 +68,20 @@ def play_audio(input):
       
   threading.Thread(target=play).start()
 
-def process_recording(stopped, q):
-    global last_response_timestamp
-    global history
-    global is_playing
-    global is_processing
-
-    while True:
-        if stopped.wait(timeout=0):
-            break
+def process_recording(recordingBytes):
+    def process():
+        global last_response_timestamp
+        global history
+        global is_playing
+        global is_processing
         
-        if not os.path.exists('./recording.tmp.wav'):
-          continue
-
         if is_playing:
-          continue
+          return
 
         is_processing = True
 
         files = {
-          'audio': open('recording.tmp.wav', 'rb')
+          'audio': recordingBytes
         }
 
         data = {
@@ -109,9 +95,7 @@ def process_recording(stopped, q):
           last_response_timestamp = time.time()
         else:
           print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
-          if os.path.exists('./recording.tmp.wav'):
-            os.remove('./recording.tmp.wav')
-          continue
+          return
 
         try:
           response_json = json.loads(response.text)
@@ -121,8 +105,6 @@ def process_recording(stopped, q):
           sttText = response_json['sttText']
           wavData = response_json['wavData']
           wavDataBytes = base64.b64decode(wavData)
-
-          run_function(llamaText_json['function'])
           
           print('\r' + "\033[32mUser:\033[0m " + sttText)
           print('\r' + "\033[34mDoogle:\033[0m " + message)
@@ -134,10 +116,9 @@ def process_recording(stopped, q):
 
           play_audio(wavDataBytes)
 
-          is_playing = False
+          run_function(llamaText_json['function'])
 
-          if os.path.exists('./recording.tmp.wav'):
-            os.remove('./recording.tmp.wav')
+          is_playing = False
           
           stream = wave.open('recording.wav', 'wb')
           stream.setnchannels(1)
@@ -146,11 +127,10 @@ def process_recording(stopped, q):
           stream.close()  
         except:
           print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
-          if os.path.exists('./recording.tmp.wav'):
-            os.remove('./recording.tmp.wav')
           is_processing = False
           is_playing = False
-          continue
+      
+    threading.Thread(target=process).start()
 
 def record(stopped, q):
     global last_response_timestamp
@@ -164,8 +144,7 @@ def record(stopped, q):
       channels=1, 
       rate=RATE, 
       input=True, 
-      frames_per_buffer=CHUNK_SIZE,
-      input_device_index=INPUT_DEVICE_INDEX
+      frames_per_buffer=CHUNK_SIZE
     )
     
     owwModel = Model(wakeword_models=[os.path.join(base_dir, 'models/hey_doogle.tflite')], inference_framework="tflite")
@@ -235,8 +214,8 @@ def record(stopped, q):
           activated = False
           time_started_recording = 0
 
-          if os.path.exists('./recording.wav'):
-            shutil.copy2('./recording.wav', './recording.tmp.wav')
+          recordingBytes = open('recording.wav', 'rb').read()
+          process_recording(recordingBytes)
 
         # Stop recording if 10 seconds have passed since started recording
         if (activated and (time_started_recording + 10 < time.time() and time_started_recording != 0)):
@@ -246,8 +225,8 @@ def record(stopped, q):
           activated = False
           time_started_recording = 0
 
-          if os.path.exists('./recording.wav'):
-            shutil.copy2('./recording.wav', './recording.tmp.wav')
+          recordingBytes = open('recording.wav', 'rb').read()
+          process_recording(recordingBytes)
 
         status = ''
 
@@ -275,8 +254,7 @@ def listen(stopped, q):
         channels=1,
         rate=RATE,
         input=True,
-        frames_per_buffer=1024,
-        input_device_index=INPUT_DEVICE_INDEX
+        frames_per_buffer=1024
     )
 
     while True:

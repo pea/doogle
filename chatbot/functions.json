@@ -1,16 +1,14 @@
 {
   "lightsOn": {
     "prompt": "Turn on the lights",
-    "command": "python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
+    "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
   },
   "lightsOff": {
     "prompt": "Turn off the lights",
-    "command": "python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
+    "command": ".venv/bin/python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
   },
   "playNtsRadioOne": {
     "prompt": "Play NTS Radio One",
-    "command": "python3 functions/radio.py 'NTS Radio 1'"
+    "command": ".venv/bin/python3 functions/radio.py 'NTS Radio 1'"
   }
 }
-
-
