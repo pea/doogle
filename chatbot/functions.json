@@ -1,14 +1,18 @@
 {
   "lightsOn": {
-    "prompt": "Turn on the lights",
+    "prompt": "Turn on the lights in the room",
     "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
   },
   "lightsOff": {
-    "prompt": "Turn off the lights",
+    "prompt": "Turn off the lights in the room",
     "command": ".venv/bin/python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
   },
   "playNtsRadioOne": {
     "prompt": "Play NTS Radio One",
-    "command": ".venv/bin/python3 functions/radio.py 'NTS Radio 1'"
+    "command": "pkill vlc; pkill VLC; sleep 1; vlc --intf rc --rc-host localhost:12345 http://stream-relay-geo.ntslive.net/stream &"
+  },
+  "stopRadio": {
+    "prompt": "Stop radio",
+    "command": "pkill vlc; pkill VLC"
   }
 }

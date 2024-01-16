@@ -92,6 +92,8 @@ To add a function, add a new item to the functions.json file. The prompt tells D
 
 Llama 2 refuses to play radio stations due to "ethical reasons". So you'll have to use a different model to do it, such as [WizardLM-1.0-Uncensored-Llama2-13B-GGUF](https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGUF).
 
+Stations can be found here: https://www.radio-browser.info
+
 ## Volume
 
 You might want to increase the mic gain and speaker volume on the Raspberry Pi. You can do this by running `alsamixer`.

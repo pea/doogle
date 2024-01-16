@@ -7,7 +7,7 @@ from functions import functions_prompt
 from functions import grammar_types
 import json
 
-history = "This is a chat between a user and a home assistant called Doogle. Doogle does not pretend. Doogle does not use emojis or emoticons. Doogle can do the following functions: " + functions_prompt() + ". function is none by default"
+history = "This is a chat between a user and an assistant called Doogle. Doogle can do the following: " + functions_prompt() + ", nothing other than chatting to the user by setting function to None."
 
 print(history)
 
@@ -19,8 +19,6 @@ while True:
         'text': userText,
         'grammar': grammar_types()
     }
-
-    print(data)
 
     response = requests.post('http://192.168.1.131:4000/message', headers=None, json=data)
 

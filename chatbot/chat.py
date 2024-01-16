@@ -20,6 +20,7 @@ from functions import functions_prompt
 from functions import grammar_types
 import threading
 import json
+import shutil
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 functions_json_file = os.path.join(base_dir, 'functions.json')
@@ -33,7 +34,7 @@ last_response_timestamp = 0
 volume_history = np.array([])
 is_processing = False
 
-history = "This is a chat between a user and a home assistant called Doogle. Doogle does not pretend. Doogle does not use emojis or emoticons. Doogle can do the following functions: " + functions_prompt() + ". function is none by default"
+history = "This is a chat between a user and an assistant called Doogle. Doogle can do the following: " + functions_prompt() + ", nothing other than chatting to the user by setting function to None."
 
 print(history)
 
@@ -59,6 +60,18 @@ def main():
     listen_t.join()
     record_t.join()
 
+def pause_media():
+  if shutil.which("nc"):
+        subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+  elif os.path.exists("/dev/tcp"):
+      subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+    
+def resume_media():
+    if shutil.which("nc"):
+        subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+    elif os.path.exists("/dev/tcp"):
+        subprocess.run("echo 'play' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+    
 def play_audio(input):
   def play():
     if os.path.exists(input):
@@ -114,9 +127,9 @@ def process_recording(recordingBytes):
           is_playing = True
           is_processing = False
 
-          play_audio(wavDataBytes)
+          threading.Thread(target=run_function(llamaText_json['function'])).start()
 
-          run_function(llamaText_json['function'])
+          play_audio(wavDataBytes)
 
           is_playing = False
           
@@ -183,6 +196,7 @@ def record(stopped, q):
         # Check for wake word if not already recording
         if (score >= 0.5 and not should_record):
             # print("Wake word detected")
+            pause_media()
             play_audio('open.wav')
             activated = True
             should_record = True
@@ -215,6 +229,7 @@ def record(stopped, q):
           time_started_recording = 0
 
           recordingBytes = open('recording.wav', 'rb').read()
+          resume_media()
           process_recording(recordingBytes)
 
         # Stop recording if 10 seconds have passed since started recording
@@ -226,6 +241,7 @@ def record(stopped, q):
           time_started_recording = 0
 
           recordingBytes = open('recording.wav', 'rb').read()
+          resume_media()
           process_recording(recordingBytes)
 
         status = ''
