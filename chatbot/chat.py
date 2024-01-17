@@ -61,23 +61,21 @@ def main():
     record_t.join()
 
 def pause_media():
-  if shutil.which("nc"):
-        subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
-  elif os.path.exists("/dev/tcp"):
-      subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+  subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+  subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
     
 def resume_media():
-    if shutil.which("nc"):
-        subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
-    elif os.path.exists("/dev/tcp"):
-        subprocess.run("echo 'play' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+    subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+    subprocess.run("echo 'play' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
     
 def play_audio(input):
   def play():
+    pause_media()
     if os.path.exists(input):
       subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    resume_media()
       
   threading.Thread(target=play).start()
 
@@ -122,7 +120,7 @@ def process_recording(recordingBytes):
           print('\r' + "\033[32mUser:\033[0m " + sttText)
           print('\r' + "\033[34mDoogle:\033[0m " + message)
 
-          history += "\n\nUser: " + sttText + "\nDoogle: " + message
+          history += "\n\nUser: " + sttText + "\nDoogle: " + llamaText
 
           is_playing = True
           is_processing = False

@@ -37,7 +37,7 @@ while True:
 
       run_function(llamaText_json['function'])
       
-      history += "\n\nUser: " + userText + "\nDoogle: " + message
+      history += "\n\nUser: " + userText + "\nDoogle: " + llamaText
     except:
       continue
 
