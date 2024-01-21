@@ -40,6 +40,21 @@ app.post('/chat', upload, async (req, res) => {
   const userText = req.body?.text;
   const grammarTypescript = req.body.grammar;
 
+  if (!history) {
+    res.status(400).send('Missing history');
+    return;
+  }
+
+  if (!userText && !file) {
+    res.status(400).send('Missing text or file');
+    return;
+  }
+
+  if (!grammarTypescript) {
+    res.status(400).send('Missing grammar');
+    return;
+  }
+
   const grammar = grammarTypescript ? serializeGrammar(await compile(grammarTypescript, "Response")) : ''
 
   try {
@@ -65,6 +80,7 @@ app.post('/chat', upload, async (req, res) => {
       }
 
       if (numRetries >= retries) {
+        console.error('Retries exceeded');
         return null;
       }
 
@@ -80,16 +96,16 @@ app.post('/chat', upload, async (req, res) => {
     const llamaTextJson = await getLlamaText();
     
     if (!llamaTextJson) {
-      res.status(500).send('Invalid response from Doogle');
+      res.status(500).send('Invalid response from LLM');
       return;
     }
 
-    if (!llamaTextJson) {
-      res.status(500).send('No response from Doogle');
+    if (llamaTextJson?.message === undefined || llamaTextJson?.message === '') {
+      res.status(500).send('Empty response from LLM');
       return;
     }
 
-    const tts = await ttsRequest(llamaTextJson?.message ?? '');
+    const tts = await ttsRequest(llamaTextJson?.message);
 
     res.writeHead(200, {
       'Content-Type': 'application/json'

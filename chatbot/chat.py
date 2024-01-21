@@ -108,58 +108,56 @@ def process_recording(recordingBytes):
           print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
           return
 
-        try:
-          response_json = json.loads(response.text)
+        response_json = json.loads(response.text)
+        llamaText = response_json['llamaText']
+        llamaText_json = llamaText
+        message = llamaText_json['message']
+        sttText = response_json['sttText']
+        wavData = response_json['wavData']
+        wavDataBytes = base64.b64decode(wavData)
+        
+        print('\r' + "\033[32mUser:\033[0m " + sttText)
+        history += "\n\nUser: " + sttText
+
+        if llamaText_json['function'] == "none" or llamaText_json['function'] == "None":
+          print('\r' + "\033[34mDoogle:\033[0m " + message)
+          history += "\n\nDoogle: " + message
+
+        function_response = run_function(llamaText_json['function'])
+
+        if function_response != None:
+          function_request_data = {
+            'history': history,
+            'text': "The function response is: " + str(function_response) + ". Please inform me of it in plain English.",
+            'grammar': grammar_types()
+          }
+
+          function_request_response = requests.post('http://192.168.1.131:4000/chat', json=function_request_data)
+
+          if (function_request_response.status_code != 200):
+            print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
+            return
+
+          response_json = json.loads(function_request_response.text)
           llamaText = response_json['llamaText']
-          llamaText_json = llamaText
-          message = llamaText_json['message']
-          sttText = response_json['sttText']
-          wavData = response_json['wavData']
-          wavDataBytes = base64.b64decode(wavData)
-          
-          print('\r' + "\033[32mUser:\033[0m " + sttText)
-          history += "\n\nUser: " + sttText
+          message = llamaText['message']
 
-          if llamaText_json['function'] == "none" or llamaText_json['function'] == "None":
-            print('\r' + "\033[34mDoogle:\033[0m " + message)
-            history += "\n\nDoogle: " + llamaText
+          print('\r' + "\033[34mDoogle:\033[0m " + message)
 
-          function_response = run_function(llamaText_json['function'])
+          history += "\n\nsDoogle: " + message
 
-          if function_response != None:
-            data = {
-              'history': history,
-              'text': "The function response is: " + str(function_response) + ". Please inform me of it in plain English.",
-              'grammar': grammar_types()
-            }
+        is_playing = True
+        is_processing = False
 
-            response = requests.post('http://192.168.1.131:4000/chat', headers=None, data=data)
+        play_audio(wavDataBytes)
 
-            response_json = response.json()
-            llamaText = response_json['llamaText']
-            llamaText_json = json.loads(llamaText)
-            message = llamaText_json['message']
-
-            print("\033[34mDoogle:\033[0m " + message)
-
-            history += "\n\nsDoogle: " + llamaText
-
-          is_playing = True
-          is_processing = False
-
-          play_audio(wavDataBytes)
-
-          is_playing = False
-          
-          stream = wave.open('recording.wav', 'wb')
-          stream.setnchannels(1)
-          stream.setsampwidth(pyaudio.get_sample_size(pyaudio.paInt16))
-          stream.setframerate(RATE)
-          stream.close()  
-        except:
-          print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
-          is_processing = False
-          is_playing = False
+        is_playing = False
+        
+        stream = wave.open('recording.wav', 'wb')
+        stream.setnchannels(1)
+        stream.setsampwidth(pyaudio.get_sample_size(pyaudio.paInt16))
+        stream.setframerate(RATE)
+        stream.close()
       
     threading.Thread(target=process).start()
 

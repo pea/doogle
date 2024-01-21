@@ -24,7 +24,7 @@
     "command": "pkill vlc; pkill VLC"
   },
   "time": {
-    "prompt": "Say what the time is",
-    "command": "python3 functions/time.py"
+    "prompt": "Say what the time is/ tell the time/ what time is it",
+    "command": ".venv/bin/python3 functions/time.py"
   }
 }
