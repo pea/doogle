@@ -11,23 +11,39 @@ history = "This is a chat between a user and an assistant called Doogle. Doogle 
 
 print(history)
 
+def message_request(history, userText, grammar):
+  data = {
+      'history': history,
+      'text': userText,
+      'grammar': grammar
+  }
+
+  return requests.post('http://192.168.1.131:4000/message', headers=None, json=data)
+
 while True:
-    userText = input("\033[32mYou:\033[0m ")
+  userText = input("\033[32mYou:\033[0m ")
 
-    data = {
-        'history': history,
-        'text': userText,
-        'grammar': grammar_types()
-    }
+  response = message_request(history, userText, grammar_types())
 
-    response = requests.post('http://192.168.1.131:4000/message', headers=None, json=data)
+  if response.status_code != 200:
+    print("\033[31mError:\033[0m " + "Something went wrong")
+    continue
 
-    if response.status_code == 200:
-        last_response_timestamp = time.time()
-    else:
-        continue
+  try:
+    response_json = response.json()
+    llamaText = response_json['llamaText']
+    llamaText_json = json.loads(llamaText)
+    message = llamaText_json['message']
 
-    try:
+    if llamaText_json['function'] == "none" or llamaText_json['function'] == "None":
+      print("\033[34mDoogle:\033[0m " + message)
+      history += "\n\nUser: " + userText + "\nDoogle: " + llamaText
+
+    function_response = run_function(llamaText_json['function'])
+
+    if function_response != None:
+      response = message_request(history, "The function response is: " + str(function_response) + ". Please inform me of it in plain English.", grammar_types())
+
       response_json = response.json()
       llamaText = response_json['llamaText']
       llamaText_json = json.loads(llamaText)
@@ -35,11 +51,7 @@ while True:
 
       print("\033[34mDoogle:\033[0m " + message)
 
-      run_function(llamaText_json['function'])
-      
-      history += "\n\nUser: " + userText + "\nDoogle: " + llamaText
-    except:
-      continue
-
-
-   
+      history += "\n\nsDoogle: " + llamaText
+  
+  except:
+    continue

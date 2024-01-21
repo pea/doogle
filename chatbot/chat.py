@@ -118,14 +118,34 @@ def process_recording(recordingBytes):
           wavDataBytes = base64.b64decode(wavData)
           
           print('\r' + "\033[32mUser:\033[0m " + sttText)
-          print('\r' + "\033[34mDoogle:\033[0m " + message)
+          history += "\n\nUser: " + sttText
 
-          history += "\n\nUser: " + sttText + "\nDoogle: " + llamaText
+          if llamaText_json['function'] == "none" or llamaText_json['function'] == "None":
+            print('\r' + "\033[34mDoogle:\033[0m " + message)
+            history += "\n\nDoogle: " + llamaText
+
+          function_response = run_function(llamaText_json['function'])
+
+          if function_response != None:
+            data = {
+              'history': history,
+              'text': "The function response is: " + str(function_response) + ". Please inform me of it in plain English.",
+              'grammar': grammar_types()
+            }
+
+            response = requests.post('http://192.168.1.131:4000/chat', headers=None, data=data)
+
+            response_json = response.json()
+            llamaText = response_json['llamaText']
+            llamaText_json = json.loads(llamaText)
+            message = llamaText_json['message']
+
+            print("\033[34mDoogle:\033[0m " + message)
+
+            history += "\n\nsDoogle: " + llamaText
 
           is_playing = True
           is_processing = False
-
-          threading.Thread(target=run_function(llamaText_json['function'])).start()
 
           play_audio(wavDataBytes)
 

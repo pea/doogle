@@ -15,7 +15,10 @@ def run_function(function_name):
 
   if function_name in data:
     function = data[function_name]
-    subprocess.run(function['command'], shell=True)
+    command = function['command']
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    return result.stdout
+    
   
 def functions_prompt():
   with open(functions_json_file) as f:

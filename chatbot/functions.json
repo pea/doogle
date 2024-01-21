@@ -11,8 +11,20 @@
     "prompt": "Play NTS Radio One",
     "command": "pkill vlc; pkill VLC; sleep 1; vlc --intf rc --rc-host localhost:12345 http://stream-relay-geo.ntslive.net/stream &"
   },
+  "playNtsRadioTwo": {
+    "prompt": "Play NTS Radio Two",
+    "command": "pkill vlc; pkill VLC; sleep 1; vlc --intf rc --rc-host localhost:12345 http://stream-relay-geo.ntslive.net/stream2 &"
+  },
+  "playJazzFm": {
+    "prompt": "Play Jazz FM",
+    "command": "pkill vlc; pkill VLC; sleep 1; vlc --intf rc --rc-host localhost:12345 https://edge-bauerall-01-gos2.sharp-stream.com/jazzhigh.aac &"
+  },
   "stopRadio": {
     "prompt": "Stop radio",
     "command": "pkill vlc; pkill VLC"
+  },
+  "time": {
+    "prompt": "Say what the time is",
+    "command": "python3 functions/time.py"
   }
 }

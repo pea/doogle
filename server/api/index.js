@@ -14,7 +14,7 @@ const upload = multer({ storage: storage }).single('audio');
 app.post('/message', async (req, res) => {
   const history = req.body?.history;
   const text = req.body?.text;
-  const grammarTypescript = req.body?.grammar;
+  const grammarTypescript = req.body.grammar;
 
   const grammar = serializeGrammar(await compile(grammarTypescript, "Response"))
 
@@ -35,34 +35,26 @@ app.post('/message', async (req, res) => {
 })
 
 app.post('/chat', upload, async (req, res) => {
-  const file = req.file;
+  const file = req?.file;
   const history = req.body.history;
+  const userText = req.body?.text;
   const grammarTypescript = req.body.grammar;
 
-  const grammar = serializeGrammar(await compile(grammarTypescript, "Response"))
-
-  if (!file) {
-    return res.status(400).send('No file uploaded.');
-  }
+  const grammar = grammarTypescript ? serializeGrammar(await compile(grammarTypescript, "Response")) : ''
 
   try {
-    const stt = await sttRequest(file.buffer);
-
-    const trimmedStt = stt
-      .replace('Thank you.', '')
-      .replace('I\'m fine.', '')
-      .replace('♪', '')
-      .trim()
-
-    if (trimmedStt.length == 0) {
-      res.status(500).send('No speech detected');
+    let stt = null;
+    if (file) {
+      stt = await sttRequest(file.buffer);
     }
 
-    const retries = 10;
+    const inputText = stt ?? userText;
+
+    const retries = 3;
     let numRetries = 0;
 
     const getLlamaText = async () => {
-      const text = await llamaRequest({text: trimmedStt, history, grammar})
+      const text = await llamaRequest({text: inputText, history, grammar})
 
       const parsedJson = () => {
         try {
@@ -70,6 +62,10 @@ app.post('/chat', upload, async (req, res) => {
         } catch (error) {
           return null;
         }
+      }
+
+      if (numRetries >= retries) {
+        return null;
       }
 
       if (!parsedJson() && numRetries < retries) {
@@ -100,7 +96,7 @@ app.post('/chat', upload, async (req, res) => {
     });
 
     res.end(JSON.stringify({
-      sttText: trimmedStt,
+      sttText: inputText,
       llamaText: llamaTextJson,
       wavData: Buffer.from(tts).toString('base64')
     }));
