@@ -122,6 +122,30 @@ app.post('/chat', upload, async (req, res) => {
   }
 });
 
+app.post('/tts', async (req, res) => {
+  const text = req.body?.text;
+
+  if (!text) {
+    res.status(400).send('Missing text');
+    return;
+  }
+
+  try {
+    const tts = await ttsRequest(text);
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json'
+    });
+
+    res.end(JSON.stringify({
+      wavData: Buffer.from(tts).toString('base64')
+    }));
+  } catch (error) {
+    console.error(error);
+    res.status(500).send(error.message);
+  }
+});
+
 function sttRequest(fileBuffer) {
   const url = "http://192.168.1.131:6060/inference";
   

@@ -61,23 +61,37 @@ def main():
     record_t.join()
 
 def pause_media():
-  subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
-  subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
+    subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
+    subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
     
 def resume_media():
-    subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
     subprocess.run("echo 'play' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
+    subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
     
 def play_audio(input):
-  def play():
-    pause_media()
     if os.path.exists(input):
       subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    resume_media()
-      
-  threading.Thread(target=play).start()
+
+def tts(text):
+  data = {
+    'text': text
+  }
+  
+  response = requests.post('http://192.168.1.131:4000/tts', headers=None, json=data)
+  
+  if response.status_code != 200:
+    print("\033[31mError:\033[0m " + "Something went wrong. Couldn't play audio of error message.")
+    return
+  
+  response_json = response.json()
+  wavData = response_json['wavData']
+  wavDataBytes = base64.b64decode(wavData)
+
+  pause_media()
+  play_audio(wavDataBytes)
+  resume_media()
 
 def process_recording(recordingBytes):
     def process():
@@ -105,6 +119,7 @@ def process_recording(recordingBytes):
         if response.status_code == 200:
           last_response_timestamp = time.time()
         else:
+          tts("Something went wrong. There was a problem receiving the reply from the server.")
           print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
           return
 
@@ -135,6 +150,7 @@ def process_recording(recordingBytes):
           function_request_response = requests.post('http://192.168.1.131:4000/chat', json=function_request_data)
 
           if (function_request_response.status_code != 200):
+            tts("Something went wrong. Couldn't play audio of function response.")
             print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
             return
 
@@ -149,7 +165,9 @@ def process_recording(recordingBytes):
         is_playing = True
         is_processing = False
 
+        pause_media()
         play_audio(wavDataBytes)
+        resume_media()
 
         is_playing = False
         
@@ -237,7 +255,7 @@ def record(stopped, q):
 
         # Stop recording if silent for 2 seconds
         if (should_record and seconds_silent > 2):
-          # print("Stopped recording")
+          resume_media()
           play_audio('close.wav')
           should_record = False
           seconds_silent = 0
@@ -245,11 +263,11 @@ def record(stopped, q):
           time_started_recording = 0
 
           recordingBytes = open('recording.wav', 'rb').read()
-          resume_media()
           process_recording(recordingBytes)
 
         # Stop recording if 10 seconds have passed since started recording
         if (activated and (time_started_recording + 10 < time.time() and time_started_recording != 0)):
+          resume_media()
           play_audio('close.wav')
           should_record = False
           seconds_silent = 0
@@ -257,7 +275,6 @@ def record(stopped, q):
           time_started_recording = 0
 
           recordingBytes = open('recording.wav', 'rb').read()
-          resume_media()
           process_recording(recordingBytes)
 
         status = ''
