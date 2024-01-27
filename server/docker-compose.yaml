@@ -8,6 +8,12 @@ services:
     restart: 'always'
 
   llamacpp:
+    build:
+      context: '.'
+      dockerfile: 'llamaCpp.Dockerfile'
+    ports:
+      - '7000:7000'
+    command: '--server -m /models/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
     restart: 'always'
     deploy:
       resources:
@@ -17,12 +23,6 @@ services:
               count: 'all'
               capabilities:
                 - 'gpu'
-    build:
-      context: '.'
-      dockerfile: 'llamaCpp.Dockerfile'
-    ports:
-      - '7000:7000'
-    command: '--server -m /models/llama-2-7b-chat.Q6_K.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
 
   whisper:
     build:
@@ -46,6 +46,22 @@ services:
       dockerfile: 'tss.Dockerfile'
     ports:
       - '5002:5002'
+    restart: 'always'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: 'nvidia'
+              count: 'all'
+              capabilities:
+                - 'gpu'
+
+  stablediffusion:
+    build:
+      context: '.'
+      dockerfile: 'stableDiffusion.Dockerfile'
+    ports:
+      - '3002:3002'
     restart: 'always'
     deploy:
       resources:

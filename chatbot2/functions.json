@@ -25,6 +25,6 @@
   },
   "time": {
     "prompt": "tell the user what the time is",
-    "command": ".venv/bin/python3 functions/time.py"
+    "command": "python3 functions/time.py"
   }
 }

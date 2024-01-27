@@ -16,9 +16,9 @@ ARG CUDA_DOCKER_ARCH=all
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y build-essential python3 python3-pip git
+    apt-get install -y build-essential python3 python3-pip git wget
 
-RUN git clone --branch b1680 https://github.com/ggerganov/llama.cpp.git /app
+RUN git clone https://github.com/ggerganov/llama.cpp.git /app
 
 RUN pip install --upgrade pip setuptools wheel \
     && pip install -r requirements.txt
@@ -35,7 +35,8 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 RUN make
 
 # Download the model
-RUN wget -O /app/models/wizardlm-1.0-uncensored-llama2-13b.Q5_K_M.gguf "https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGUF/resolve/main/wizardlm-1.0-uncensored-llama2-13b.Q5_K_M.gguf?download=true"
+RUN mkdir /models
+RUN wget -O /models/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf "https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGUF/resolve/main/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf?download=true"
 
 ENTRYPOINT ["/app/.devops/tools.sh"]
 
