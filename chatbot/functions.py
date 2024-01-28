@@ -2,23 +2,27 @@ import json
 import subprocess
 import json
 import os
+import threading
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 functions_json_file = os.path.join(base_dir, 'functions.json')
 
 def run_function(function_name):
-  if function_name == "none":
-    return
+  def run_command():
+    if function_name == "none":
+      return
 
-  with open(functions_json_file) as f:
+    with open(functions_json_file) as f:
       data = json.load(f)
 
-  if function_name in data:
-    function = data[function_name]
-    command = function['command']
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    return result.stdout
-    
+    if function_name in data:
+      function = data[function_name]
+      command = function['command']
+      result = subprocess.run(command, shell=True, capture_output=True, text=True)
+      return result.stdout
+
+  thread = threading.Thread(target=run_command)
+  thread.start()
   
 def functions_prompt():
   with open(functions_json_file) as f:

@@ -70,10 +70,14 @@ class ChatBot:
     return (in_data, pyaudio.paContinue)
   
   def play_audio(self, input):
-    if os.path.exists(input):
-      subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    else:
-       subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    def run_ffplay():
+      if os.path.exists(input):
+        subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+      else:
+        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    thread = threading.Thread(target=run_ffplay)
+    thread.start()
 
   def find_microphone_index(self, partial_name):
     pi = pyaudio.PyAudio()
