@@ -97,3 +97,13 @@ Stations can be found here: https://www.radio-browser.info
 ## Volume
 
 You might want to increase the mic gain and speaker volume on the Raspberry Pi. You can do this by running `alsamixer`.
+
+## Respeaker
+
+# Give user permission to use the device
+
+- `lsusb` and find vendor ID and product ID (e.g. 2886:0018)
+- `sudo nano /etc/udev/rules.d/99-com.rules`
+- Add `SUBSYSTEM=="usb", ATTR{idVendor}=="2886", ATTR{idProduct}=="0018", MODE="0666"`
+- `sudo udevadm control --reload-rules`
+- `sudo udevadm trigger`

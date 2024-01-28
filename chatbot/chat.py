@@ -1,341 +1,241 @@
 #!/home/doogle/doogle/chatbot/.venv/bin/python3
 
-import threading
-from array import array
-import queue
 import pyaudio
-import wave
-import requests
-from openwakeword.model import Model
-import numpy as np
 import time
+import numpy as np
+from openwakeword.model import Model
+from respeaker.tuning import Tuning
+import usb.core
+import usb.util
+import wave
 import subprocess
 import os
-import shutil
-import requests
-import base64
-import time
-from functions import run_function
-from functions import functions_prompt
-from functions import grammar_types
 import threading
+import requests
 import json
-import shutil
+import base64
+from functions import run_function
+from functions import grammar_types
+from prompt import prompt
+import io
 
-base_dir = os.path.dirname(os.path.abspath(__file__))
-functions_json_file = os.path.join(base_dir, 'functions.json')
+class ChatBot:
+  def __init__(self):
+    self.owwModel = Model(wakeword_models=['/home/doogle/doogle/chatbot/hey_doogle.tflite'], inference_framework="tflite")
+    self.CHUNK = 1024
+    self.RATE = 16000
+    self.p = pyaudio.PyAudio()
+    self.stream = None
+    self.recording = None
+    self.time_last_voice_detected = 0
+    self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
+    self.Mic_tuning = Tuning(self.mic_instance)
+    self.should_record = False
+    self.is_recording = False
+    self.history = prompt()
 
-CHUNK_SIZE = 1024
-BUF_MAX_SIZE = CHUNK_SIZE * 10
-RATE = 16000
+  def stream_callback(self, in_data, frame_count, time_info, status):
+    data = np.frombuffer(in_data, dtype=np.int16)
+    prediction = self.owwModel.predict(np.frombuffer(data, dtype=np.int16))
+    model_name = list(self.owwModel.models.keys())[0]
+    score = prediction[model_name]
 
-is_playing = False
-last_response_timestamp = 0
-volume_history = np.array([])
-is_processing = False
+    voice_detected = self.Mic_tuning.is_voice()
 
-history = "This is a chat between a user and an assistant called Doogle. Doogle can do the following: " + functions_prompt() + ", nothing other than chatting to the user by setting function to None."
+    if voice_detected:
+      self.time_last_voice_detected = time.time()
+    else:
+      if time.time() - self.time_last_voice_detected > 2:
+        if self.recording is not None:
+          self.play_audio("sound/close.wav")
+          self.resume_media()
+          self.handle_recording()
+          self.should_record = False
+          self.is_recording = False
 
-print(history)
+    if score >= 0.5:
+      self.should_record = True
 
-def main():
-    stopped = threading.Event()
-    q = queue.Queue(maxsize=int(round(BUF_MAX_SIZE / CHUNK_SIZE)))
+    if self.should_record and not self.is_recording:
+      self.play_audio("sound/open.wav")
 
-    if os.path.exists('./recording.wav'):
-      os.remove('./recording.wav')
+    if self.should_record:
+      self.is_recording = True
+      self.pause_media()
+      if self.recording is None:
+        self.recording = data
+      else:
+        self.recording = np.concatenate((self.recording, data))
 
-    listen_t = threading.Thread(target=listen, args=(stopped, q))
-    listen_t.start()
-    record_t = threading.Thread(target=record, args=(stopped, q))
-    record_t.start()
-
-    try:
-        while True:
-            listen_t.join(0.1)
-            record_t.join(0.1)
-    except KeyboardInterrupt:
-        stopped.set()
-
-    listen_t.join()
-    record_t.join()
-
-def pause_media():
-    subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
-    subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
-    
-def resume_media():
-    subprocess.run("echo 'play' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
-    subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
-    
-def play_audio(input):
+    return (in_data, pyaudio.paContinue)
+  
+  def play_audio(self, input):
     if os.path.exists(input):
       subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-def tts(text):
-  data = {
-    'text': text
-  }
+  def find_microphone_index(self, partial_name):
+    pi = pyaudio.PyAudio()
+    info = pi.get_host_api_info_by_index(0)
+    numdevices = info.get('deviceCount')
+    for i in range(0, numdevices):
+        if (pi.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
+            device_name = pi.get_device_info_by_host_api_device_index(0, i).get('name')
+            if partial_name in device_name:
+                return i
+    return None
   
-  response = requests.post('http://192.168.1.131:4000/tts', headers=None, json=data)
+  def frames_to_wav(self, frames, sample_width, channels, sample_rate):
+    wav_io = io.BytesIO()
+
+    with wave.open(wav_io, 'wb') as wav_file:
+        wav_file.setsampwidth(sample_width)
+        wav_file.setnchannels(channels)
+        wav_file.setframerate(sample_rate)
+
+        for frame in frames:
+            wav_file.writeframes(frame)
+
+    wav_data = wav_io.getvalue()
+
+    return wav_data
   
-  if response.status_code != 200:
-    print("\033[31mError:\033[0m " + "Something went wrong. Couldn't play audio of error message.")
-    return
+  def llm_request(self, recording=None, text=None):
+    if recording is not None and text is not None:
+      return
+
+    if recording is not None:
+      recording_wav = self.frames_to_wav(recording, pyaudio.get_sample_size(pyaudio.paInt16), 1, 16000)
+      files = {
+        'audio': recording_wav
+      }
+
+      data = {
+        'history': self.history,
+        'grammar': grammar_types()
+      }
+
+      response = requests.post(
+        'http://192.168.1.131:4000/chat',
+        headers=None,
+        files=files,
+        data=data
+      )
+
+      self.recording = None
+
+    if text is not None:
+      data = {
+        'text': text,
+        'history': self.history,
+        'grammar': grammar_types()
+      }
+
+      response = requests.post(
+        'http://192.168.1.131:4000/chat',
+        headers=None,
+        json=data
+      )
+
+    if response.status_code != 200:
+      self.tts("There was an error with a request to the LLM server. " + response.text)
+
+    response_json = json.loads(response.text)
+    llamaText = response_json['llamaText']
+    llamaText_json = llamaText
+    message = llamaText_json['message']
+    sttText = response_json['sttText']
+    wavData = response_json['wavData']
+    function = llamaText_json['function']
+    wavDataBytes = base64.b64decode(wavData)
+    
+    return (message, sttText, wavDataBytes, function)
   
-  response_json = response.json()
-  wavData = response_json['wavData']
-  wavDataBytes = base64.b64decode(wavData)
+  def handle_function(self, function):
+    function_response = run_function(function)
 
-  pause_media()
-  play_audio(wavDataBytes)
-  resume_media()
+    llm_response = self.llm_request(
+      text="The function response is: " + str(function_response) + ". Please inform me of it in plain English."
+    )
 
-def process_recording(recordingBytes):
-    def process():
-        global last_response_timestamp
-        global history
-        global is_playing
-        global is_processing
-        
-        if is_playing:
-          return
+    message, sttText, wavDataBytes, function = llm_response
 
-        is_processing = True
+    self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
+    self.pause_media()
+    self.play_audio(wavDataBytes)
+    self.resume_media()
+  
+  def handle_recording(self):
+    if self.recording is None:
+      return
+  
+    llm_response = self.llm_request(recording=self.recording)
 
-        files = {
-          'audio': recordingBytes
-        }
+    if llm_response is None:
+      return
+    
+    message, sttText, wavDataBytes, function = llm_response
 
-        data = {
-          'history': history,
-          'grammar': grammar_types()
-        }
+    self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
 
-        response = requests.post('http://192.168.1.131:4000/chat', headers=None, files=files, data=data)
+    if function != "None" and function != "none":
+      self.handle_function(function)
+      return
+    else:
+      self.pause_media()
+      self.play_audio(wavDataBytes)
+      self.resume_media()
 
-        if response.status_code == 200:
-          last_response_timestamp = time.time()
-        else:
-          tts("Something went wrong. There was a problem receiving the reply from the server.")
-          print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
-          return
-
-        response_json = json.loads(response.text)
-        llamaText = response_json['llamaText']
-        llamaText_json = llamaText
-        message = llamaText_json['message']
-        sttText = response_json['sttText']
-        wavData = response_json['wavData']
-        wavDataBytes = base64.b64decode(wavData)
-        
-        print('\r' + "\033[32mUser:\033[0m " + sttText)
-        history += "\n\nUser: " + sttText
-
-        if llamaText_json['function'] == "none" or llamaText_json['function'] == "None":
-          print('\r' + "\033[34mDoogle:\033[0m " + message)
-          history += "\n\nDoogle: " + message
-
-        function_response = run_function(llamaText_json['function'])
-
-        if function_response != None:
-          function_request_data = {
-            'history': history,
-            'text': "The function response is: " + str(function_response) + ". Please inform me of it in plain English.",
-            'grammar': grammar_types()
-          }
-
-          function_request_response = requests.post('http://192.168.1.131:4000/chat', json=function_request_data)
-
-          if (function_request_response.status_code != 200):
-            tts("Something went wrong. Couldn't play audio of function response.")
-            print('\r' + "\033[31mError:\033[0m " + "Something went wrong")
-            return
-
-          response_json = json.loads(function_request_response.text)
-          llamaText = response_json['llamaText']
-          message = llamaText['message']
-
-          print('\r' + "\033[34mDoogle:\033[0m " + message)
-
-          history += "\n\nsDoogle: " + message
-
-        is_playing = True
-        is_processing = False
-
-        pause_media()
-        play_audio(wavDataBytes)
-        resume_media()
-
-        is_playing = False
-        
-        stream = wave.open('recording.wav', 'wb')
-        stream.setnchannels(1)
-        stream.setsampwidth(pyaudio.get_sample_size(pyaudio.paInt16))
-        stream.setframerate(RATE)
-        stream.close()
+  def pause_media(self):
+      subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
+      subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
       
-    threading.Thread(target=process).start()
+  def resume_media(self):
+      subprocess.run("echo 'play' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
+      subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
 
-def record(stopped, q):
-    global last_response_timestamp
-    global volume_history
-    global is_processing
-    global is_playing
-
-    audio = pyaudio.PyAudio()
-    mic_stream = audio.open(
-      format=pyaudio.paInt16, 
-      channels=1, 
-      rate=RATE, 
-      input=True, 
-      frames_per_buffer=CHUNK_SIZE
-    )
+  def tts(self, text):
+    data = {
+      'text': text
+    }
     
-    owwModel = Model(wakeword_models=[os.path.join(base_dir, 'models/hey_doogle.tflite')], inference_framework="tflite")
-
-    stream = wave.open('recording.wav', 'wb')
-    stream.setnchannels(1)
-    stream.setsampwidth(pyaudio.get_sample_size(pyaudio.paInt16))
-    stream.setframerate(RATE)
-    seconds_silent = 0
-    should_record = False
-    activated = False
-    time_started_recording = 0
-    max_volume = 0
-
-    play_audio('start.wav')
-
-    while True:
-        if stopped.wait(timeout=0):
-            break
-
-        prediction = owwModel.predict(np.frombuffer(mic_stream.read(CHUNK_SIZE), dtype=np.int16))
-        model_name = list(owwModel.models.keys())[0]
-        score = prediction[model_name]
-
-        chunk = q.get()
-        vol = max(chunk)
-
-        volume_history = np.append(volume_history, vol)
-        if len(volume_history) > 100:
-          volume_history = volume_history[1:]     
-
-        max_volume = max(max_volume, vol)
-        base_volume = get_baseline_volume()
-        sound_bars = volume_to_bars(vol * 0.7 / max_volume)
-
-        # Check for wake word if not already recording
-        if (score >= 0.5 and not should_record):
-            # print("Wake word detected")
-            pause_media()
-            play_audio('open.wav')
-            activated = True
-            should_record = True
+    response = requests.post('http://192.168.1.131:4000/tts', headers=None, json=data)
     
-        # Start recording
-        if should_record:
-          try:
-            stream.writeframes(chunk)
-          except:
-            pass
+    if response.status_code != 200:
+      return
+    
+    response_json = response.json()
+    wavData = response_json['wavData']
+    wavDataBytes = base64.b64decode(wavData)
 
-        # Set time recording started
-        if (should_record):
-          if (time_started_recording == 0):
-            time_started_recording = time.time()
+    self.pause_media()
+    self.play_audio(wavDataBytes)
+    self.resume_media()
 
-        # Measure seconds of silence
-        if (vol * 0.7 < base_volume):
-          seconds_silent += CHUNK_SIZE / RATE
-        else:
-          seconds_silent = 0
-
-        # Stop recording if silent for 2 seconds
-        if (should_record and seconds_silent > 2):
-          resume_media()
-          play_audio('close.wav')
-          should_record = False
-          seconds_silent = 0
-          activated = False
-          time_started_recording = 0
-
-          recordingBytes = open('recording.wav', 'rb').read()
-          process_recording(recordingBytes)
-
-        # Stop recording if 10 seconds have passed since started recording
-        if (activated and (time_started_recording + 10 < time.time() and time_started_recording != 0)):
-          resume_media()
-          play_audio('close.wav')
-          should_record = False
-          seconds_silent = 0
-          activated = False
-          time_started_recording = 0
-
-          recordingBytes = open('recording.wav', 'rb').read()
-          process_recording(recordingBytes)
-
-        status = ''
-
-        if should_record:
-            status = 'Listening' + ' ' + sound_bars
-        else:
-          if is_processing:
-            status = 'Waiting for reply...'
-
-        print(f'\r{"".ljust(40)}', end='')
-        print(f'\r{status}', end='')
-
-def volume_to_bars(vol_percent_increase, scale=30):
-  # Convert the volume percentage increase to an integer
-  vol_int = int(vol_percent_increase * scale)
-
-  # Create a string of ▓ and ░ characters
-  bars = '▓' * vol_int + '░' * (scale - vol_int)
-
-  return bars
-
-def listen(stopped, q):
-    stream = pyaudio.PyAudio().open(
-        format=pyaudio.paInt16,
-        channels=1,
-        rate=RATE,
-        input=True,
-        frames_per_buffer=1024
+  def start(self):
+    self.stream = self.p.open(
+      format=pyaudio.paInt16,
+      channels=1,
+      rate=self.RATE,
+      input=True,
+      input_device_index=self.find_microphone_index("ReSpeaker"),
+      frames_per_buffer=self.CHUNK,
+      stream_callback=self.stream_callback
     )
+    self.stream.start_stream()
+    self.play_audio("sound/start.wav")
 
-    while True:
-        if stopped.wait(timeout=0):
-            break
-        try:
-            q.put(array('h', stream.read(CHUNK_SIZE)))
-        except queue.Full:
-            pass
+  def stop(self):
+    if self.stream is not None:
+      self.stream.stop_stream()
+      self.stream.close()
+    self.p.terminate()
 
-def get_baseline_volume():
-  global volume_history
+chatbot = ChatBot()
+chatbot.start()
 
-  data = volume_history
-  # Calculate Q1, Q3 and IQR
-  Q1 = np.percentile(data, 25)
-  Q3 = np.percentile(data, 75)
-  IQR = Q3 - Q1
+while chatbot.stream.is_active():
+  time.sleep(0.1)
 
-  # Define upper and lower limits for outliers
-  upper_limit = Q3 + 1.5 * IQR
-  lower_limit = Q1 - 1.5 * IQR
-
-  # Remove outliers
-  filtered_data = data[(data >= lower_limit) & (data <= upper_limit)]
-
-  # Calculate mean and standard deviation
-  mean = np.mean(filtered_data)
-
-  rounded_mean = round(mean)
-
-  return rounded_mean
-
-if __name__ == '__main__':
-    main()
+chatbot.stop()

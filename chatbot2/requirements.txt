@@ -1,7 +1,0 @@
-pyaudio
-requests
-numpy
-openwakeword
-rpi_rf
-python-vlc
-pyradios

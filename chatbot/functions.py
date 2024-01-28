@@ -19,6 +19,7 @@ def run_function(function_name):
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     return result.stdout
     
+  
 def functions_prompt():
   with open(functions_json_file) as f:
       data = json.load(f)
