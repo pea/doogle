@@ -33,6 +33,7 @@ class ChatBot:
     self.should_record = False
     self.is_recording = False
     self.history = prompt()
+    self.media_paused = False
 
   def stream_callback(self, in_data, frame_count, time_info, status):
     data = np.frombuffer(in_data, dtype=np.int16)
@@ -48,8 +49,8 @@ class ChatBot:
       if time.time() - self.time_last_voice_detected > 2:
         if self.recording is not None:
           self.play_audio("sound/close.wav")
-          self.resume_media()
           self.handle_recording()
+          self.resume_media()
           self.should_record = False
           self.is_recording = False
 
@@ -70,14 +71,10 @@ class ChatBot:
     return (in_data, pyaudio.paContinue)
   
   def play_audio(self, input):
-    def run_ffplay():
-      if os.path.exists(input):
-        subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-      else:
-        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    thread = threading.Thread(target=run_ffplay)
-    thread.start()
+    if os.path.exists(input):
+      subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+       subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
   def find_microphone_index(self, partial_name):
     pi = pyaudio.PyAudio()
@@ -192,12 +189,20 @@ class ChatBot:
       self.resume_media()
 
   def pause_media(self):
+      if self.media_paused:
+        return
+
       subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
       subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+      self.media_paused = True
       
   def resume_media(self):
+      if not self.media_paused:
+        return
+
       subprocess.run("echo 'play' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
       subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+      self.media_paused = False
 
   def tts(self, text):
     data = {
