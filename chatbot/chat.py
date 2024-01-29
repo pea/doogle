@@ -18,6 +18,8 @@ from functions import run_function
 from functions import grammar_types
 from prompt import prompt
 import io
+import RPi.GPIO as GPIO
+from respeaker.pixel_ring.pixel_ring import pixel_ring
 
 class ChatBot:
   def __init__(self):
@@ -28,12 +30,15 @@ class ChatBot:
     self.stream = None
     self.recording = None
     self.time_last_voice_detected = 0
+    self.time_started_recording = 0
     self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
     self.Mic_tuning = Tuning(self.mic_instance)
     self.should_record = False
     self.is_recording = False
     self.history = prompt()
     self.media_paused = False
+
+    self.setup_leds()
 
   def stream_callback(self, in_data, frame_count, time_info, status):
     data = np.frombuffer(in_data, dtype=np.int16)
@@ -53,6 +58,7 @@ class ChatBot:
           self.resume_media()
           self.should_record = False
           self.is_recording = False
+          self.time_started_recording = 0
 
     if score >= 0.5:
       self.should_record = True
@@ -62,11 +68,20 @@ class ChatBot:
 
     if self.should_record:
       self.is_recording = True
+      self.time_started_recording = time.time()
       self.pause_media()
       if self.recording is None:
         self.recording = data
       else:
         self.recording = np.concatenate((self.recording, data))
+
+    if self.is_recording and time.time() - self.time_started_recording > 10:
+      self.play_audio("sound/close.wav")
+      self.handle_recording()
+      self.resume_media()
+      self.should_record = False
+      self.is_recording = False
+      self.time_started_recording = 0
 
     return (in_data, pyaudio.paContinue)
   
@@ -86,6 +101,20 @@ class ChatBot:
             if partial_name in device_name:
                 return i
     return None
+  
+  def setup_leds(self):
+    en_pin = 12
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(en_pin, GPIO.OUT)
+    GPIO.output(en_pin, GPIO.LOW)
+    darkerorange = 0xff9600
+    orange = 0xFFA500
+    yellow = 0xFFFF00
+    white = 0xFFFFFF
+    blue = 0x0000FF 
+    pixel_ring.set_brightness(100)
+    pixel_ring.set_color_palette(blue, 0xff9600)
+    pixel_ring.trace()
   
   def frames_to_wav(self, frames, sample_width, channels, sample_rate):
     wav_io = io.BytesIO()

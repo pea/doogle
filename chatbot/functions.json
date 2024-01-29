@@ -1,10 +1,10 @@
 {
   "lightsOn": {
-    "prompt": "turn on the lights",
+    "prompt": "turn on the lightsn if they're already on",
     "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
   },
   "lightsOff": {
-    "prompt": "turn off the lights",
+    "prompt": "turn off the lights even if they're already off",
     "command": ".venv/bin/python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
   },
   "playNtsRadioOne": {
