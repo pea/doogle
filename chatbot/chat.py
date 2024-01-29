@@ -20,6 +20,7 @@ from prompt import prompt
 import io
 import RPi.GPIO as GPIO
 from respeaker.pixel_ring.pixel_ring import pixel_ring
+import threading
 
 class ChatBot:
   def __init__(self):
@@ -33,12 +34,19 @@ class ChatBot:
     self.time_started_recording = 0
     self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
     self.Mic_tuning = Tuning(self.mic_instance)
+    # self.Mic_tuning.set_vad_threshold(900)
     self.should_record = False
     self.is_recording = False
     self.history = prompt()
     self.media_paused = False
+    self.should_pulse_leds = False
+    self.time_last_response = 0
+    self.should_stop_pulsing = False
+    self.pulse_leds_thread = None
 
     self.setup_leds()
+
+    self.change_media_volume(200)
 
   def stream_callback(self, in_data, frame_count, time_info, status):
     data = np.frombuffer(in_data, dtype=np.int16)
@@ -51,7 +59,7 @@ class ChatBot:
     if voice_detected:
       self.time_last_voice_detected = time.time()
     else:
-      if time.time() - self.time_last_voice_detected > 2:
+      if time.time() - self.time_last_voice_detected > 4:
         if self.recording is not None:
           self.play_audio("sound/close.wav")
           self.handle_recording()
@@ -83,6 +91,10 @@ class ChatBot:
       self.is_recording = False
       self.time_started_recording = 0
 
+    if self.time_last_response != 0 and time.time() - self.time_last_response > 20:
+      self.time_last_response = 0
+      self.history = prompt()
+
     return (in_data, pyaudio.paContinue)
   
   def play_audio(self, input):
@@ -108,13 +120,34 @@ class ChatBot:
     GPIO.setup(en_pin, GPIO.OUT)
     GPIO.output(en_pin, GPIO.LOW)
     darkerorange = 0xff9600
-    orange = 0xFFA500
-    yellow = 0xFFFF00
-    white = 0xFFFFFF
     blue = 0x0000FF 
-    pixel_ring.set_brightness(100)
-    pixel_ring.set_color_palette(blue, 0xff9600)
+    pixel_ring.set_brightness(20)
+    pixel_ring.set_color_palette(blue, darkerorange)
     pixel_ring.trace()
+
+  def start_pulse_leds(self):
+        def pulse_leds():
+            while not self.should_stop_pulsing:
+                for i in range(0, 31):
+                    pixel_ring.mono(0xff9600)
+                    pixel_ring.set_brightness(i)
+                    time.sleep(0.01)
+
+                for i in range(31, 0, -1):
+                    pixel_ring.mono(0xff9600)
+                    pixel_ring.set_brightness(i)
+                    time.sleep(0.01)
+
+        self.should_stop_pulsing = False
+        self.pulse_leds_thread = threading.Thread(target=pulse_leds)
+        self.pulse_leds_thread.start()
+
+  def stop_pulse_leds(self):
+      self.should_stop_pulsing = True
+      if self.pulse_leds_thread is not None:
+          self.pulse_leds_thread.join()  # Wait for the thread to finish
+      pixel_ring.off()
+      pixel_ring.set_brightness(20)
   
   def frames_to_wav(self, frames, sample_width, channels, sample_rate):
     wav_io = io.BytesIO()
@@ -135,6 +168,8 @@ class ChatBot:
     if recording is not None and text is not None:
       return
 
+    self.start_pulse_leds()
+
     if recording is not None:
       recording_wav = self.frames_to_wav(recording, pyaudio.get_sample_size(pyaudio.paInt16), 1, 16000)
       files = {
@@ -154,6 +189,7 @@ class ChatBot:
       )
 
       self.recording = None
+      self.time_last_response = time.time()
 
     if text is not None:
       data = {
@@ -168,6 +204,8 @@ class ChatBot:
         json=data
       )
 
+    self.stop_pulse_leds()
+    
     if response.status_code != 200:
       self.tts("There was an error with a request to the LLM server. " + response.text)
 
@@ -216,6 +254,10 @@ class ChatBot:
       self.pause_media()
       self.play_audio(wavDataBytes)
       self.resume_media()
+  
+  def change_media_volume(self, volume):
+    subprocess.run("echo 'volume " + str(volume) + "' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
+    subprocess.run("echo 'volume " + str(volume) + "' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
 
   def pause_media(self):
       if self.media_paused:
