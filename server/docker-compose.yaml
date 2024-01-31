@@ -56,18 +56,18 @@ services:
               capabilities:
                 - 'gpu'
 
-  stablediffusion:
-    build:
-      context: '.'
-      dockerfile: 'stableDiffusion.Dockerfile'
-    ports:
-      - '3002:3002'
-    restart: 'always'
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: 'nvidia'
-              count: 'all'
-              capabilities:
-                - 'gpu'
+  # stablediffusion:
+  #   build:
+  #     context: '.'
+  #     dockerfile: 'stableDiffusion.Dockerfile'
+  #   ports:
+  #     - '3002:3002'
+  #   restart: 'always'
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: 'nvidia'
+  #             count: 'all'
+  #             capabilities:
+  #               - 'gpu'

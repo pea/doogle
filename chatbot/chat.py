@@ -4,7 +4,6 @@ import pyaudio
 import time
 import numpy as np
 from openwakeword.model import Model
-from respeaker.tuning import Tuning
 import usb.core
 import usb.util
 import wave
@@ -18,13 +17,20 @@ from functions import run_function
 from functions import grammar_types
 from prompt import prompt
 import io
-import RPi.GPIO as GPIO
-from respeaker.pixel_ring.pixel_ring import pixel_ring
 import threading
+
+try:
+  import RPi.GPIO as GPIO
+  from respeaker.pixel_ring.pixel_ring import pixel_ring
+  from respeaker.tuning import Tuning
+except ImportError:
+  GPIO = None
+  pixel_ring = None
+  Tuning = None
 
 class ChatBot:
   def __init__(self):
-    self.owwModel = Model(wakeword_models=['/home/doogle/doogle/chatbot/hey_doogle.tflite'], inference_framework="tflite")
+    self.owwModel = Model(wakeword_models=['./hey_doogle.tflite'], inference_framework="tflite")
     self.CHUNK = 1024
     self.RATE = 16000
     self.p = pyaudio.PyAudio()
@@ -32,9 +38,6 @@ class ChatBot:
     self.recording = None
     self.time_last_voice_detected = 0
     self.time_started_recording = 0
-    self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
-    self.Mic_tuning = Tuning(self.mic_instance)
-    # self.Mic_tuning.set_vad_threshold(900)
     self.should_record = False
     self.is_recording = False
     self.history = prompt()
@@ -43,6 +46,13 @@ class ChatBot:
     self.time_last_response = 0
     self.should_stop_pulsing = False
     self.pulse_leds_thread = None
+
+    try:
+      self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
+      self.Mic_tuning = Tuning(self.mic_instance)
+      # self.Mic_tuning.set_vad_threshold(900)
+    except Exception as e:
+      self.Mic_tuning = None  
 
     self.setup_leds()
 
@@ -54,12 +64,15 @@ class ChatBot:
     model_name = list(self.owwModel.models.keys())[0]
     score = prediction[model_name]
 
-    voice_detected = self.Mic_tuning.is_voice()
+    if self.Mic_tuning is not None:
+      voice_detected = self.Mic_tuning.is_voice()
+    else:
+      voice_detected = score >= 0.5
 
     if voice_detected:
       self.time_last_voice_detected = time.time()
     else:
-      if time.time() - self.time_last_voice_detected > 4:
+      if time.time() - self.time_last_voice_detected > 2:
         if self.recording is not None:
           self.play_audio("sound/close.wav")
           self.handle_recording()
@@ -70,6 +83,7 @@ class ChatBot:
 
     if score >= 0.5:
       self.should_record = True
+      self.time_last_voice_detected = time.time()
 
     if self.should_record and not self.is_recording:
       self.play_audio("sound/open.wav")
@@ -115,39 +129,46 @@ class ChatBot:
     return None
   
   def setup_leds(self):
-    en_pin = 12
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(en_pin, GPIO.OUT)
-    GPIO.output(en_pin, GPIO.LOW)
-    darkerorange = 0xff9600
-    blue = 0x0000FF 
-    pixel_ring.set_brightness(20)
-    pixel_ring.set_color_palette(blue, darkerorange)
-    pixel_ring.trace()
+    if self.Mic_tuning is not None:
+      en_pin = 12
+      GPIO.setmode(GPIO.BCM)
+      GPIO.setup(en_pin, GPIO.OUT)
+      GPIO.output(en_pin, GPIO.LOW)
+      darkerorange = 0xff9600
+      blue = 0x0000FF 
+      pixel_ring.set_brightness(20)
+      pixel_ring.set_color_palette(blue, darkerorange)
+      pixel_ring.trace()
 
   def start_pulse_leds(self):
-        def pulse_leds():
-            while not self.should_stop_pulsing:
-                for i in range(0, 31):
-                    pixel_ring.mono(0xff9600)
-                    pixel_ring.set_brightness(i)
-                    time.sleep(0.01)
+    if self.Mic_tuning is None:
+      return
 
-                for i in range(31, 0, -1):
-                    pixel_ring.mono(0xff9600)
-                    pixel_ring.set_brightness(i)
-                    time.sleep(0.01)
+    def pulse_leds():
+        while not self.should_stop_pulsing:
+            for i in range(0, 31):
+                pixel_ring.mono(0xff9600)
+                pixel_ring.set_brightness(i)
+                time.sleep(0.01)
 
-        self.should_stop_pulsing = False
-        self.pulse_leds_thread = threading.Thread(target=pulse_leds)
-        self.pulse_leds_thread.start()
+            for i in range(31, 0, -1):
+                pixel_ring.mono(0xff9600)
+                pixel_ring.set_brightness(i)
+                time.sleep(0.01)
+
+    self.should_stop_pulsing = False
+    self.pulse_leds_thread = threading.Thread(target=pulse_leds)
+    self.pulse_leds_thread.start()
 
   def stop_pulse_leds(self):
-      self.should_stop_pulsing = True
-      if self.pulse_leds_thread is not None:
-          self.pulse_leds_thread.join()  # Wait for the thread to finish
-      pixel_ring.off()
-      pixel_ring.set_brightness(20)
+    if self.Mic_tuning is None:
+      return
+    
+    self.should_stop_pulsing = True
+    if self.pulse_leds_thread is not None:
+        self.pulse_leds_thread.join()  # Wait for the thread to finish
+    pixel_ring.off()
+    pixel_ring.set_brightness(20)
   
   def frames_to_wav(self, frames, sample_width, channels, sample_rate):
     wav_io = io.BytesIO()
@@ -176,8 +197,11 @@ class ChatBot:
         'audio': recording_wav
       }
 
+      userStt = self.sst(recording_wav)
+      new_prompt = prompt(userText=userStt)
+
       data = {
-        'history': self.history,
+        'history': new_prompt,
         'grammar': grammar_types()
       }
 
@@ -194,7 +218,7 @@ class ChatBot:
     if text is not None:
       data = {
         'text': text,
-        'history': self.history,
+        'history': prompt,
         'grammar': grammar_types()
       }
 
@@ -209,19 +233,27 @@ class ChatBot:
     if response.status_code != 200:
       self.tts("There was an error with a request to the LLM server. " + response.text)
 
-    response_json = json.loads(response.text)
-    llamaText = response_json['llamaText']
-    llamaText_json = llamaText
-    message = llamaText_json['message']
-    sttText = response_json['sttText']
-    wavData = response_json['wavData']
-    function = llamaText_json['function']
-    wavDataBytes = base64.b64decode(wavData)
+    try:
+      response_json = json.loads(response.text)
+      llamaText = response_json['llamaText']
+      llamaText_json = llamaText
+      message = llamaText_json['message']
+      sttText = response_json['sttText']
+      wavData = response_json['wavData']
+      function = llamaText_json['function']
+      wavDataBytes = base64.b64decode(wavData)
+    except Exception as e:
+      self.tts("There was an error with a request to the LLM server. " + str(e))
+      print(e)
+      return
     
     return (message, sttText, wavDataBytes, function)
   
   def handle_function(self, function):
     function_response = run_function(function)
+
+    if function_response is None:
+      return
 
     llm_response = self.llm_request(
       text="The function response is: " + str(function_response) + ". Please inform me of it in plain English."
@@ -292,6 +324,19 @@ class ChatBot:
     self.pause_media()
     self.play_audio(wavDataBytes)
     self.resume_media()
+
+  def sst(self, wavDataBytes):
+    files = {
+      'file': wavDataBytes
+    }
+
+    response = requests.post('http://192.168.1.131:6060/inference', headers=None, files=files)
+
+    if response.status_code != 200:
+      self.tts(response.text)
+      return
+    
+    return response.text
 
   def start(self):
     self.stream = self.p.open(

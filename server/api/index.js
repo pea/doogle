@@ -222,6 +222,32 @@ function ttsRequest(text) {
   });
 }
 
+
+const tortoiseTtsRequest = async (text) => {
+  const url = 'http://192.168.1.131:6700/stream';
+  const params = {
+    text: text,
+    voice: 'pat2'
+  };
+
+  const response = await axios.post(url, params, {
+    responseType: 'stream'
+  });
+
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    response.data.on('data', (chunk) => {
+      chunks.push(chunk)
+    })
+    response.data.on('end', () => {
+      resolve(Buffer.concat(chunks))
+    })
+    response.data.on('error', (error) => {
+      reject(error)
+    })
+  })
+}
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
