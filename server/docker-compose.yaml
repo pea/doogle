@@ -1,16 +1,16 @@
 services:
   api:
     build:
-      context: '.'
-      dockerfile: 'api.Dockerfile'
+      context: './api'
+      dockerfile: 'Dockerfile'
     ports:
       - '4000:4000'
     restart: 'always'
 
   llamacpp:
     build:
-      context: '.'
-      dockerfile: 'llamaCpp.Dockerfile'
+      context: './llamaCpp'
+      dockerfile: 'Dockerfile'
     ports:
       - '7000:7000'
     command: '--server -m /models/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
@@ -26,8 +26,8 @@ services:
 
   whisper:
     build:
-      context: '.'
-      dockerfile: 'whisperCpp.Dockerfile'
+      context: './whisperCpp'
+      dockerfile: 'Dockerfile'
     ports:
       - '6060:8080'
     restart: 'always'
@@ -42,8 +42,8 @@ services:
 
   tts:
     build:
-      context: '.'
-      dockerfile: 'tss.Dockerfile'
+      context: './tts'
+      dockerfile: 'Dockerfile'
     ports:
       - '5002:5002'
     restart: 'always'
@@ -56,13 +56,52 @@ services:
               capabilities:
                 - 'gpu'
 
+  openwakewordtrain:
+    build:
+      context: './openWakeWordTraining'
+      dockerfile: 'Dockerfile'
+    ports:
+      - '8888:8888'
+    volumes:
+      - './.cache:/root/.cache'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: 'nvidia'
+              count: 'all'
+              capabilities:
+                - 'gpu'
+
+  # Stable Diffusion
+  #
   # stablediffusion:
   #   build:
-  #     context: '.'
-  #     dockerfile: 'stableDiffusion.Dockerfile'
+  #     context: './stableDiffusion'
+  #     dockerfile: 'Dockerfile'
   #   ports:
   #     - '3002:3002'
   #   restart: 'always'
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: 'nvidia'
+  #             count: 'all'
+  #             capabilities:
+  #               - 'gpu'
+
+  # Tortoise TTS Server
+  # Can replace tts service but requires port change and api request changes in api service
+  #
+  # tortoise:
+  #   build:
+  #     context: './tortoise'
+  #     dockerfile: 'Dockerfile'
+  #   ports:
+  #     - '6700:6700'
+  #   volumes:
+  #     - './.cache:/root/.cache'
   #   deploy:
   #     resources:
   #       reservations:

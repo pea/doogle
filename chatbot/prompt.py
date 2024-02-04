@@ -1,6 +1,8 @@
 from functions import functions_prompt
+from functions import run_function
 import json
 import os
+import subprocess
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -24,13 +26,21 @@ def prompt(userText = None):
           matching_functions.append(function)
           break
 
-    sentences = []
+    function_array = []
 
     for function in matching_functions:
-      sentences.append(function['prompt'] + " by setting function to " + str(function['name']))
+      if function['type'] == 'command':
+        function_array.append("Doogle can " + function['prompt'] + " by setting function to " + str(function['name']) + " with option set to what the user asked for")
+      elif function['type'] == 'environment':
+        function_response = run_function(function['name'])
+        if function_response is not None:
+          function_array.append(function['prompt'].replace("[function_response]", function_response))
 
-    function_list = ', '.join(sentences)
+    function_list = '. '.join(function_array)
     
-    function_prompt = "Doogle can do the following: " + function_list + ", nothing other than chatting to the user by setting function to None."
+    if len(function_list) > 0:
+      function_prompt = function_list
+    else:
+      function_prompt = ""
   
-  return "This is a chat between a user and an assistant called Doogle. " + function_prompt
+  return "This is a chat between a user and an assistant called Doogle. " + function_prompt + ". Doogle sets function to None if just chatting"

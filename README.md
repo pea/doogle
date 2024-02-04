@@ -77,22 +77,21 @@ Reboot the Raspberry Pi.
 
 ### Functions
 
-Functions are rudimentary but still somewhat reliable. They use grammar to have Doogle return JSON. Doogle can return the name of a function being requested by the user, and then Doogle runs the matching command. Currently it's more of a binary switch, so can't return any other data with the function, but it would be possible to add.
+To add a function, create a new item in `functions.json`.
 
-To add a function, add a new item to the functions.json file. The prompt tells Doogle when it can do, e.g. "play music". The command is what's run.
+index: the text ID of the function
+Type: "environment" or "command". `command` phrases the instruction as "Doogle can..", `environment` phrases the instruction as "the time is..". Add [function_response] to the prompt to have the response from the function inserted into the environment-type prompt.
+triggerWords: When any of these words are spoken by the user, the function prompt will be added. This allows for many functions without bogging down the request with a long prompt.
+command: The command to run when the function is triggered. The command can return a response in any format - Doogle will read it in plain English.
 
 ```
-"playNtsRadioOne": {
-  "prompt": "Play NTS Radio One",
-  "command": "python3 functions/radio.py 'NTS Radio 1'"
+"time": {
+  "type": "environment",
+  "prompt": "the time is [function_response]",
+  "triggerWords": ["time"],
+  "command": "python3 functions/time.py"
 }
 ```
-
-#### Radio
-
-Llama 2 refuses to play radio stations due to "ethical reasons". So you'll have to use a different model to do it, such as [WizardLM-1.0-Uncensored-Llama2-13B-GGUF](https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGUF).
-
-Stations can be found here: https://www.radio-browser.info
 
 ## Volume
 
@@ -100,10 +99,17 @@ You might want to increase the mic gain and speaker volume on the Raspberry Pi. 
 
 ## Respeaker
 
-# Give user permission to use the device
+The Doogle chatbot can be used with a standard USB microphone, but it's designed to work with the ReSpeaker 4-Mic Array for Raspberry Pi. This is a 4-microphone array that can be used to detect the direction of sound and provides VAD capabilities. It's also a speaker, so it can be used to play audio.
+
+# Give user permission to use the Repspeaker
 
 - `lsusb` and find vendor ID and product ID (e.g. 2886:0018)
 - `sudo nano /etc/udev/rules.d/99-com.rules`
 - Add `SUBSYSTEM=="usb", ATTR{idVendor}=="2886", ATTR{idProduct}=="0018", MODE="0666"`
 - `sudo udevadm control --reload-rules`
 - `sudo udevadm trigger`
+
+## Debugging
+
+`cd ~/doogle/chatbot`
+`pkill chat.py && .venv/bin/python3 chat.py debug`

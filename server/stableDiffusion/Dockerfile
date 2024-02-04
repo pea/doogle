@@ -12,6 +12,6 @@ EXPOSE 3002
 
 WORKDIR /app
 
-COPY ./stableDiffusion /app
+COPY . /app
 
 CMD ["python3", "server.py", "--model", "/models/stable-diffusion-xl-base-1.0"]

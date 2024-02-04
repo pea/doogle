@@ -6,10 +6,8 @@ from functions import run_function
 from functions import functions_prompt
 from functions import grammar_types
 import json
-
-history = "This is a chat between a user and an assistant called Doogle. Doogle can do the following: " + functions_prompt() + ", nothing other than chatting to the user by setting function to None."
-
-print(history)
+from prompt import prompt
+import subprocess
 
 def message_request(history, userText, grammar):
   data = {
@@ -22,6 +20,8 @@ def message_request(history, userText, grammar):
 
 while True:
   userText = input("\033[32mYou:\033[0m ")
+
+  history = prompt(userText)
 
   response = message_request(history, userText, grammar_types())
 
@@ -39,7 +39,7 @@ while True:
       print("\033[34mDoogle:\033[0m " + message)
       history += "\n\nUser: " + userText + "\nDoogle: " + llamaText
 
-    function_response = run_function(llamaText_json['function'])
+    function_response = run_function(llamaText_json['function'], llamaText_json['option'])
 
     if function_response != None:
       response = message_request(history, "The function response is: " + str(function_response) + ". Please inform me of it in plain English.", grammar_types())

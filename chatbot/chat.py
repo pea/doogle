@@ -15,9 +15,14 @@ import json
 import base64
 from functions import run_function
 from functions import grammar_types
+from functions import get_function
 from prompt import prompt
 import io
 import threading
+import queue
+import sys
+
+debug = sys.argv[1] == "debug" if len(sys.argv) > 1 else False
 
 try:
   import RPi.GPIO as GPIO
@@ -74,7 +79,7 @@ class ChatBot:
     else:
       if time.time() - self.time_last_voice_detected > 2:
         if self.recording is not None:
-          self.play_audio("sound/close.wav")
+          self.play_audio("sound/close.wav", 100)
           self.handle_recording()
           self.resume_media()
           self.should_record = False
@@ -86,19 +91,22 @@ class ChatBot:
       self.time_last_voice_detected = time.time()
 
     if self.should_record and not self.is_recording:
-      self.play_audio("sound/open.wav")
+      self.play_audio("sound/open.wav", 100)
 
     if self.should_record:
       self.is_recording = True
-      self.time_started_recording = time.time()
+      
+      if self.time_started_recording == 0:
+        self.time_started_recording = time.time()
+
       self.pause_media()
       if self.recording is None:
-        self.recording = data
+          self.recording = data
       else:
         self.recording = np.concatenate((self.recording, data))
 
     if self.is_recording and time.time() - self.time_started_recording > 10:
-      self.play_audio("sound/close.wav")
+      self.play_audio("sound/close.wav", 100)
       self.handle_recording()
       self.resume_media()
       self.should_record = False
@@ -108,14 +116,15 @@ class ChatBot:
     if self.time_last_response != 0 and time.time() - self.time_last_response > 20:
       self.time_last_response = 0
       self.history = prompt()
+      self.play_audio("sound/reset.wav", 100)
 
     return (in_data, pyaudio.paContinue)
   
-  def play_audio(self, input):
+  def play_audio(self, input, volume=256):
     if os.path.exists(input):
-      subprocess.run(["ffplay", "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+      subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
-       subprocess.run(["ffplay", "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+       subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
   def find_microphone_index(self, partial_name):
     pi = pyaudio.PyAudio()
@@ -128,6 +137,9 @@ class ChatBot:
                 return i
     return None
   
+  def voice_direction(self):
+    return self.Mic_tuning.direction
+  
   def setup_leds(self):
     if self.Mic_tuning is not None:
       en_pin = 12
@@ -135,26 +147,40 @@ class ChatBot:
       GPIO.setup(en_pin, GPIO.OUT)
       GPIO.output(en_pin, GPIO.LOW)
       darkerorange = 0xff9600
-      blue = 0x0000FF 
-      pixel_ring.set_brightness(20)
-      pixel_ring.set_color_palette(blue, darkerorange)
+      red = 0xff0000
+      black = 0x000000
+      teal = 0x00ffff
+      green = 0x00ff00
+      pixel_ring.set_brightness(1)
+      pixel_ring.set_color_palette(teal, black)
       pixel_ring.trace()
+
+      def vad_direction():
+        while self.Mic_tuning is not None:
+          if self.Mic_tuning.is_voice():
+            pixel_ring.listen()
+            pixel_ring.set_color_palette(green, black)
+          else:
+            pixel_ring.set_color_palette(teal, black)
+          time.sleep(0.1)
+      
+      threading.Thread(target=vad_direction).start()
 
   def start_pulse_leds(self):
     if self.Mic_tuning is None:
       return
 
     def pulse_leds():
-        while not self.should_stop_pulsing:
-            for i in range(0, 31):
-                pixel_ring.mono(0xff9600)
-                pixel_ring.set_brightness(i)
-                time.sleep(0.01)
+      while not self.should_stop_pulsing:
+        for i in range(0, 31):
+          pixel_ring.mono(0xff9600)
+          pixel_ring.set_brightness(i)
+          time.sleep(0.01)
 
-            for i in range(31, 0, -1):
-                pixel_ring.mono(0xff9600)
-                pixel_ring.set_brightness(i)
-                time.sleep(0.01)
+        for i in range(31, 0, -1):
+          pixel_ring.mono(0xff9600)
+          pixel_ring.set_brightness(i)
+          time.sleep(0.01)
 
     self.should_stop_pulsing = False
     self.pulse_leds_thread = threading.Thread(target=pulse_leds)
@@ -167,8 +193,7 @@ class ChatBot:
     self.should_stop_pulsing = True
     if self.pulse_leds_thread is not None:
         self.pulse_leds_thread.join()  # Wait for the thread to finish
-    pixel_ring.off()
-    pixel_ring.set_brightness(20)
+    self.setup_leds()
   
   def frames_to_wav(self, frames, sample_width, channels, sample_rate):
     wav_io = io.BytesIO()
@@ -205,6 +230,9 @@ class ChatBot:
         'grammar': grammar_types()
       }
 
+      if debug:
+        print(data)
+
       response = requests.post(
         'http://192.168.1.131:4000/chat',
         headers=None,
@@ -218,9 +246,12 @@ class ChatBot:
     if text is not None:
       data = {
         'text': text,
-        'history': prompt,
+        'history': prompt(),
         'grammar': grammar_types()
       }
+
+      if debug:
+        print(data)
 
       response = requests.post(
         'http://192.168.1.131:4000/chat',
@@ -235,28 +266,37 @@ class ChatBot:
 
     try:
       response_json = json.loads(response.text)
+
+      if debug:
+        debug_response = response_json
+        debug_response['wavData'] = "WAV DATA"
+        print(debug_response)
+
       llamaText = response_json['llamaText']
       llamaText_json = llamaText
       message = llamaText_json['message']
       sttText = response_json['sttText']
       wavData = response_json['wavData']
       function = llamaText_json['function']
+      option = llamaText_json['option']
       wavDataBytes = base64.b64decode(wavData)
     except Exception as e:
       self.tts("There was an error with a request to the LLM server. " + str(e))
       print(e)
       return
     
-    return (message, sttText, wavDataBytes, function)
+    return (message, sttText, wavDataBytes, function, option)
   
-  def handle_function(self, function):
-    function_response = run_function(function)
+  def handle_function(self, function, option):
+    run_function(function, option)
+
+    function_response = None
 
     if function_response is None:
       return
 
     llm_response = self.llm_request(
-      text="The function response is: " + str(function_response) + ". Please inform me of it in plain English."
+      text="The response from the " + function + " function is: " + str(function_response) + ". Please inform me of it in plain English."
     )
 
     message, sttText, wavDataBytes, function = llm_response
@@ -275,13 +315,21 @@ class ChatBot:
     if llm_response is None:
       return
     
-    message, sttText, wavDataBytes, function = llm_response
+    message, sttText, wavDataBytes, function, option = llm_response
 
     self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
 
+
     if function != "None" and function != "none":
-      self.handle_function(function)
-      return
+      functionObj = get_function(function)
+      if functionObj['type'] == 'command':
+        self.handle_function(function, option)
+        return
+      elif functionObj['type'] == 'environment':
+        self.pause_media()
+        self.play_audio(wavDataBytes)
+        self.resume_media()
+        return
     else:
       self.pause_media()
       self.play_audio(wavDataBytes)
@@ -295,16 +343,22 @@ class ChatBot:
       if self.media_paused:
         return
 
-      subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
-      subprocess.run("echo 'pause' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+      try:
+        subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", shell=True, executable="/bin/bash")
+      except:
+        pass
+
       self.media_paused = True
       
   def resume_media(self):
       if not self.media_paused:
         return
 
-      subprocess.run("echo 'play' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
-      subprocess.run("echo 'play' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+      try:
+        subprocess.run("echo 'play' > /dev/tcp/localhost/12345", shell=True, executable="/bin/bash")
+      except:
+        pass
+      
       self.media_paused = False
 
   def tts(self, text):
@@ -349,7 +403,7 @@ class ChatBot:
       stream_callback=self.stream_callback
     )
     self.stream.start_stream()
-    self.play_audio("sound/start.wav")
+    self.play_audio("sound/start.wav", 100)
 
   def stop(self):
     if self.stream is not None:

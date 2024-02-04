@@ -1,37 +1,62 @@
 {
   "lightsOn": {
+    "type": "command",
     "prompt": "turn on the lightsn if they're already on",
     "triggerWords": ["lights"],
     "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
   },
   "lightsOff": {
+    "type": "command",
     "prompt": "turn off the lights even if they're already off",
     "triggerWords": ["lights"],
     "command": ".venv/bin/python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
   },
   "playNtsRadioOne": {
+    "type": "command",
     "prompt": "play NTS Radio One",
     "triggerWords": ["radio", "play", "nts"],
     "command": "pkill vlc; pkill VLC; sleep 1; vlc --intf rc --rc-host localhost:12345 http://stream-relay-geo.ntslive.net/stream &"
   },
   "playNtsRadioTwo": {
+    "type": "command",
     "prompt": "play NTS Radio Two",
     "triggerWords": ["radio", "play", "nts"],
     "command": "pkill vlc; pkill VLC; sleep 1; vlc --intf rc --rc-host localhost:12345 http://stream-relay-geo.ntslive.net/stream2 &"
   },
+  "playNtsRadioExpansions": {
+    "type": "command",
+    "prompt": "play NTS Radio Expansions",
+    "triggerWords": ["radio", "play", "nts"],
+    "command": "pkill vlc; pkill VLC; sleep 1; vlc --intf rc --rc-host localhost:12345 https://stream-mixtape-geo.ntslive.net/mixtape3?client=NTSWebApp&t=1706890892205 &"
+  },
   "playJazzFm": {
+    "type": "command",
     "prompt": "play Jazz FM",
     "triggerWords": ["radio", "play", "jazz"],
     "command": "pkill vlc; pkill VLC; sleep 1; vlc --intf rc --rc-host localhost:12345 https://edge-bauerall-01-gos2.sharp-stream.com/jazzhigh.aac &"
   },
   "stopRadio": {
+    "type": "command",
     "prompt": "stop radio",
     "triggerWords": ["radio", "stop"],
     "command": "pkill vlc; pkill VLC"
   },
   "time": {
-    "prompt": "get the current time and tell the user what it is",
+    "type": "environment",
+    "prompt": "the current time is [function_response]",
     "triggerWords": ["time"],
     "command": "python3 functions/time.py"
+  },
+  "volume": {
+    "type": "command",
+    "prompt": "change the volume by setting option to the chosen number and",
+    "triggerWords": ["volume"],
+    "command": "python3 functions/volume.py --volume [option]"
+  },
+  "restart": {
+    "type": "command",
+    "prompt": "restart the system",
+    "triggerWords": ["restart"],
+    "command": "python3 functions/restart.py"
   }
 }
