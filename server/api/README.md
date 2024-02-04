@@ -35,3 +35,13 @@ interface Response {
   function: Functions;
 }"'
 ```
+
+## Response
+
+```
+{
+  "sttText": "hello",
+  "llamaText": "Hello I am Doogle",
+  "wavData": <Wave file base64>
+}
+```
