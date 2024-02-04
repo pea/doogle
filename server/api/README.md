@@ -4,7 +4,7 @@ This is the API for Doogle. The language model (llamaCpp), speech-to-text (whisp
 
 # Example Request
 
-# Sending wav recording of user
+## Sending wav recording of user
 
 ```
 curl --location 'http://192.168.1.131:4000/chat' \
@@ -20,7 +20,7 @@ interface Response {
 }"'
 ```
 
-# Sending text from user
+## Sending text from user
 
 ```
 curl --location 'http://192.168.1.131:4000/chat' \
