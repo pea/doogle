@@ -101,7 +101,7 @@ You might want to increase the mic gain and speaker volume on the Raspberry Pi. 
 
 The Doogle chatbot can be used with a standard USB microphone, but it's designed to work with the ReSpeaker 4-Mic Array for Raspberry Pi. This is a 4-microphone array that can be used to detect the direction of sound and provides VAD capabilities. It's also a speaker, so it can be used to play audio.
 
-# Give user permission to use the Repspeaker
+### Give user permission to use the Repspeaker
 
 - `lsusb` and find vendor ID and product ID (e.g. 2886:0018)
 - `sudo nano /etc/udev/rules.d/99-com.rules`

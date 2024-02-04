@@ -63,7 +63,7 @@ services:
     ports:
       - '8888:8888'
     volumes:
-      - './.cache:/root/.cache'
+      - './openWakeWordTraining/my_custom_model/:/app/my_custom_model'
     deploy:
       resources:
         reservations:
