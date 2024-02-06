@@ -60,10 +60,13 @@ services:
     build:
       context: './openWakeWordTraining'
       dockerfile: 'Dockerfile'
+    shm_size: '3g'
     ports:
       - '8888:8888'
     volumes:
       - './openWakeWordTraining/my_custom_model/:/app/my_custom_model'
+      - './openWakeWordTraining/openwakeword:/app/openwakeword'
+      - './openWakeWordTraining/audioset:/app/audioset'
     deploy:
       resources:
         reservations:

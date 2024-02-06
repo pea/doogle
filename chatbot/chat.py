@@ -35,7 +35,7 @@ except ImportError:
 
 class ChatBot:
   def __init__(self):
-    self.owwModel = Model(wakeword_models=['./hey_doogle.tflite'], inference_framework="tflite")
+    self.owwModel = Model(wakeword_models=['./models/hey_doogle.tflite'], inference_framework="tflite")
     self.CHUNK = 1024
     self.RATE = 16000
     self.p = pyaudio.PyAudio()
@@ -55,9 +55,8 @@ class ChatBot:
     try:
       self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
       self.Mic_tuning = Tuning(self.mic_instance)
-      # self.Mic_tuning.set_vad_threshold(900)
     except Exception as e:
-      self.Mic_tuning = None  
+      self.Mic_tuning = None
 
     self.setup_leds()
 
@@ -86,12 +85,13 @@ class ChatBot:
           self.is_recording = False
           self.time_started_recording = 0
 
-    if score >= 0.5:
+    if score >= 0.1:
       self.should_record = True
       self.time_last_voice_detected = time.time()
 
     if self.should_record and not self.is_recording:
       self.play_audio("sound/open.wav", 100)
+      pixel_ring.listen()
 
     if self.should_record:
       self.is_recording = True
@@ -104,6 +104,7 @@ class ChatBot:
           self.recording = data
       else:
         self.recording = np.concatenate((self.recording, data))
+        pixel_ring.trace()
 
     if self.is_recording and time.time() - self.time_started_recording > 10:
       self.play_audio("sound/close.wav", 100)
@@ -113,7 +114,7 @@ class ChatBot:
       self.is_recording = False
       self.time_started_recording = 0
 
-    if self.time_last_response != 0 and time.time() - self.time_last_response > 20:
+    if self.time_last_response != 0 and time.time() - self.time_last_response > 20 and self.recording is None:
       self.time_last_response = 0
       self.history = prompt()
       self.play_audio("sound/reset.wav", 100)
@@ -146,25 +147,20 @@ class ChatBot:
       GPIO.setmode(GPIO.BCM)
       GPIO.setup(en_pin, GPIO.OUT)
       GPIO.output(en_pin, GPIO.LOW)
-      darkerorange = 0xff9600
-      red = 0xff0000
-      black = 0x000000
-      teal = 0x00ffff
-      green = 0x00ff00
       pixel_ring.set_brightness(1)
-      pixel_ring.set_color_palette(teal, black)
+      pixel_ring.set_color_palette(self.colour('cyan'), self.colour('black'))
       pixel_ring.trace()
 
-      def vad_direction():
-        while self.Mic_tuning is not None:
-          if self.Mic_tuning.is_voice():
-            pixel_ring.listen()
-            pixel_ring.set_color_palette(green, black)
-          else:
-            pixel_ring.set_color_palette(teal, black)
-          time.sleep(0.1)
+      # def vad_direction():
+      #   while self.Mic_tuning is not None:
+      #     if self.Mic_tuning.is_voice():
+      #       pixel_ring.listen()
+      #       pixel_ring.set_color_palette(green, black)
+      #     else:
+      #       pixel_ring.set_color_palette(teal, black)
+      #     time.sleep(0.1)
       
-      threading.Thread(target=vad_direction).start()
+      # threading.Thread(target=vad_direction).start()
 
   def start_pulse_leds(self):
     if self.Mic_tuning is None:
@@ -214,7 +210,8 @@ class ChatBot:
     if recording is not None and text is not None:
       return
 
-    self.start_pulse_leds()
+    # self.start_pulse_leds()
+    pixel_ring.spin()
 
     if recording is not None:
       recording_wav = self.frames_to_wav(recording, pyaudio.get_sample_size(pyaudio.paInt16), 1, 16000)
@@ -259,7 +256,8 @@ class ChatBot:
         json=data
       )
 
-    self.stop_pulse_leds()
+    # self.stop_pulse_leds()
+    pixel_ring.trace()
     
     if response.status_code != 200:
       self.tts("There was an error with a request to the LLM server. " + response.text)
@@ -410,6 +408,24 @@ class ChatBot:
       self.stream.stop_stream()
       self.stream.close()
     self.p.terminate()
+
+  def colour(self, name):
+    if name == "red":
+      return 0xff0000
+    elif name == "green":
+      return 0x00ff00
+    elif name == "blue":
+      return 0x0000ff
+    elif name == "yellow":
+      return 0xffff00
+    elif name == "purple":
+      return 0xff00ff
+    elif name == "cyan":
+      return 0x00ffff
+    elif name == "white":
+      return 0xffffff
+    else:
+      return 0x000000
 
 chatbot = ChatBot()
 chatbot.start()
