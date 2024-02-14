@@ -8,6 +8,9 @@ from functions import grammar_types
 import json
 from prompt import prompt
 import subprocess
+import sys
+
+debug = sys.argv[1] == "debug" if len(sys.argv) > 1 else False
 
 def message_request(history, userText, grammar):
   data = {
@@ -16,7 +19,10 @@ def message_request(history, userText, grammar):
       'grammar': grammar
   }
 
-  return requests.post('http://192.168.1.131:4000/message', headers=None, json=data)
+  if debug:
+    print(data)
+
+  return requests.post('http://192.168.1.131:4000/chat', headers=None, json=data)
 
 while True:
   userText = input("\033[32mYou:\033[0m ")
@@ -31,6 +37,12 @@ while True:
 
   try:
     response_json = response.json()
+  
+    if debug:
+      debug_response = response_json
+      debug_response['wavData'] = "WAV DATA"
+      print(debug_response)
+
     llamaText = response_json['llamaText']
     llamaText_json = json.loads(llamaText)
     message = llamaText_json['message']

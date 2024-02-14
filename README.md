@@ -113,3 +113,34 @@ The Doogle chatbot can be used with a standard USB microphone, but it's designed
 
 `cd ~/doogle/chatbot`
 `pkill chat.py && .venv/bin/python3 chat.py debug`
+
+## Wake Words
+
+# Turn the lights on
+
+Settings used
+```
+config["target_phrase"] = ["turn the lights on", "Doogle lights on", "lights on"]
+config["custom_negative_phrases"] = ["turn the lights off", "Doogle lights off", "lights off"]
+config["n_samples"] = 100000
+config["n_samples_val"] = 2000
+config["steps"] = 100000
+config["target_accuracy"] = 0.7
+config["target_recall"] = 0.5
+config["target_false_positives_per_hour"] = 0.2
+config["max_negative_weight"] = 1000
+```
+
+# Turn the lights off
+
+```
+config["target_phrase"] = ["turn the lights off", "Doogle lights off", "lights off"]
+config["custom_negative_phrases"] = ["turn the lights on", "Doogle lights on", "lights on"]
+config["n_samples"] = 100000
+config["n_samples_val"] = 2000
+config["steps"] = 100000
+config["target_accuracy"] = 0.7
+config["target_recall"] = 0.5
+config["target_false_positives_per_hour"] = 0.2
+config["max_negative_weight"] = 1000
+```

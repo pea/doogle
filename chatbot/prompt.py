@@ -9,38 +9,59 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 functions_json_file = os.path.join(base_dir, 'functions.json')
 
 def prompt(userText = None):
-  function_prompt = ""
-  if userText is not None:
-    with open(functions_json_file) as f:
-      data = json.load(f)
-    
+  with open(functions_json_file) as f:
+      functions_json = json.load(f)
+
+  prompt = "This is a chat between a user and Doogle.\nDoogle sets function to None if just chatting.\n"
+
+  # Handle environment functions
+  environment_functions = []
+  for function in functions_json.values():
+    if function['type'] == 'environment':
+      function_response = subprocess.run(function['command'], shell=True, capture_output=True, text=True)
+      if function_response is not None:
+        environment_functions.append(function['prompt'].replace("[function_response]", str(function_response.stdout)))
+  environment_functions = '.\n'.join(environment_functions) if len(environment_functions) > 0 else ""
+  environment_functions = environment_functions if len(environment_functions) > 0 else ""
+  prompt = prompt + environment_functions
+  
+  # Add functions if trigger words are found
+  if userText is not None:    
     matching_functions = []
-    for key, item in data.items():
+    for key, item in functions_json.items():
       function = item
-      trigger_words_array = function['triggerWords']
-      if trigger_words_array is None:
+      try:
+        trigger_words_array = function['triggerWords']
+        if trigger_words_array is None:
+          continue
+        for trigger_word in trigger_words_array:
+          if trigger_word in userText:
+            function['name'] = key
+            matching_functions.append(function)
+            break
+      except:
         continue
-      for trigger_word in trigger_words_array:
-        if trigger_word in userText:
-          function['name'] = key
-          matching_functions.append(function)
-          break
 
-    function_array = []
-
+    # Handle regular functions
+    can_do_functions = []
     for function in matching_functions:
       if function['type'] == 'command':
-        function_array.append("Doogle can " + function['prompt'] + " by setting function to " + str(function['name']) + " with option set to what the user asked for")
-      elif function['type'] == 'environment':
-        function_response = run_function(function['name'])
-        if function_response is not None:
-          function_array.append(function['prompt'].replace("[function_response]", function_response))
+        can_do_functions.append("Doogle can " + function['prompt'])
+    can_do_functions = '.\n'.join(can_do_functions) if len(can_do_functions) > 0 else ""
+    can_do_functions = can_do_functions if len(can_do_functions) > 0 else ""
+    prompt = prompt + can_do_functions
+    if len(can_do_functions) > 0:
+      prompt = prompt + "\n"
 
-    function_list = '. '.join(function_array)
-    
-    if len(function_list) > 0:
-      function_prompt = function_list
-    else:
-      function_prompt = ""
-  
-  return "This is a chat between a user and an assistant called Doogle. " + function_prompt + ". Doogle sets function to None if just chatting"
+    # Handle function examples
+    function_examples = []
+    for function in matching_functions:
+      if function['type'] == 'command':
+        optionExample = function['optionExample'] if 'optionExample' in function else "None"
+        function_examples.append("User: " + function['prompt'] + ". \nDoogle: {'message': '', 'function': '" + function["name"] + "', 'options': '" + optionExample + "'}\n")
+    function_examples = ''.join(function_examples)
+    function_examples = function_examples + "\n" if len(function_examples) > 0 else ""
+    if len(function_examples) > 0:
+      prompt = prompt + function_examples
+
+  return prompt

@@ -1,0 +1,72 @@
+import subprocess
+import requests
+import base64
+import argparse
+import threading
+import time
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--time', type=int, default=10)
+args = parser.parse_args()
+
+def tts(text):
+  data = {
+    'text': text
+  }
+  
+  response = requests.post('http://192.168.1.131:4000/tts', headers=None, json=data, timeout=10)
+  
+  if response.status_code != 200:
+    return
+  
+  response_json = response.json()
+  wavData = response_json['wavData']
+  wavDataBytes = base64.b64decode(wavData)
+
+  subprocess.run(["ffplay", "-volume", "256", "-nodisp", "-autoexit", "-"], input=wavDataBytes, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def play_pause_media():
+  try:
+    subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", shell=True, executable="/bin/bash")
+  except:
+    pass
+
+def play_alert():
+  subprocess.run(["ffplay", "-volume", "256", "-nodisp", "-autoexit", 'sound/start.wav'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+time_in_minutes = round(args.time / 60)
+time_in_seconds = round(args.time % 60)
+
+time_readable = ''
+if time_in_minutes > 1:
+  time_readable = f'{time_in_minutes} minutes'
+else:
+  time_readable = f'{time_in_seconds} seconds'
+
+def timer_thread():
+  play_pause_media()
+
+  play_alert()
+
+  print(f'Starting timer for {time_readable}')
+  tts(f'Starting timer for {time_readable}')
+
+  play_pause_media()
+
+  subprocess.run(["sleep", str(args.time)])
+
+  play_pause_media()
+  
+  play_alert()
+
+  print(f'The {time_readable} timer has finished')
+  tts(f'The {time_readable} timer has finished')
+
+  for _ in range(3):
+    play_alert()
+    time.sleep(2)
+
+  play_pause_media()
+
+thread = threading.Thread(target=timer_thread)
+thread.start()
