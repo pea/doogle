@@ -39,7 +39,7 @@ while True:
     response_json = response.json()
   
     if debug:
-      debug_response = response_json
+      debug_response = response_json.copy()
       debug_response['wavData'] = "WAV DATA"
       print(debug_response)
 

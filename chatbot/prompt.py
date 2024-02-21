@@ -12,7 +12,7 @@ def prompt(userText = None):
   with open(functions_json_file) as f:
       functions_json = json.load(f)
 
-  prompt = "This is a chat between a user and Doogle.\nDoogle sets function to None if just chatting.\n"
+  prompt = "This is a chat between a user and Doogle.\n"
 
   # Handle environment functions
   environment_functions = []

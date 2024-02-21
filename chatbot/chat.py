@@ -17,11 +17,13 @@ from functions import run_function
 from functions import grammar_types
 from functions import get_function
 from functions import get_functions_by_type
+from functions import trigger_words_detected
 from prompt import prompt
 import io
 import threading
 import queue
 import sys
+from helpers import is_json
 
 debug = sys.argv[1] == "debug" if len(sys.argv) > 1 else False
 
@@ -252,9 +254,14 @@ class ChatBot:
       userStt = self.sst(recording_wav)
       new_prompt = prompt(userText=userStt)
 
+      if len(trigger_words_detected(userStt)) > 0:
+        grammar = grammar_types()
+      else:
+        grammar = ""
+
       data = {
         'history': new_prompt,
-        'grammar': grammar_types()
+        'grammar': grammar
       }
 
       if debug:
@@ -274,7 +281,7 @@ class ChatBot:
       data = {
         'text': text,
         'history': prompt(),
-        'grammar': grammar_types()
+        'grammar': ''
       }
 
       if debug:
@@ -291,30 +298,32 @@ class ChatBot:
       pixel_ring.trace()
     except:
       pass
-    
+
     if response.status_code != 200:
       self.tts("There was an error with a request. " + response.text)
 
-    try:
-      response_json = json.loads(response.text)
+    response_json = json.loads(response.text)
 
-      if debug:
-        debug_response = response_json
-        debug_response['wavData'] = "WAV DATA"
-        print(debug_response)
+    if debug:
+      debug_response = response_json.copy()
+      debug_response['wavData'] = "WAV DATA"
+      print(debug_response)
 
-      llamaText = response_json['llamaText']
+    llamaText = response_json['llamaText']
+
+    message = llamaText
+    function = "None"
+    option = "None"
+
+    if not isinstance(llamaText, str):
       llamaText_json = llamaText
       message = llamaText_json['message']
-      sttText = response_json['sttText']
-      wavData = response_json['wavData']
       function = llamaText_json['function']
       option = llamaText_json['option']
-      wavDataBytes = base64.b64decode(wavData)
-    except Exception as e:
-      self.tts("There was an error with a request. " + str(e))
-      print(e)
-      return
+
+    sttText = response_json['sttText']
+    wavData = response_json['wavData']
+    wavDataBytes = base64.b64decode(wavData)
     
     return (message, sttText, wavDataBytes, function, option)
   

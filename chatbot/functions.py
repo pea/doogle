@@ -57,6 +57,27 @@ def functions_prompt():
 
   return result
 
+def trigger_words_detected(userText):
+  with open(functions_json_file) as f:
+    data = json.load(f)
+
+  matching_functions = []
+  for key, item in data.items():
+    function = item
+    try:
+      trigger_words_array = function['triggerWords']
+      if trigger_words_array is None:
+        continue
+      for trigger_word in trigger_words_array:
+        if trigger_word in userText:
+          function['name'] = key
+          matching_functions.append(function)
+          break
+    except:
+      continue
+
+  return matching_functions
+
 def grammar_types():
   with open(functions_json_file) as f:
     data = json.load(f)

@@ -43,8 +43,7 @@
   },
   "time": {
     "type": "environment",
-    "prompt": "the current time IS available. The current time IS set to [function_response]",
-    "triggerWords": ["time"],
+    "prompt": "the current time IS AVAILABLE. The current time IS SET to [function_response]",
     "command": "python3 functions/time.py"
   },
   "volume": {

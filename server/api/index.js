@@ -38,7 +38,7 @@ app.post('/chat', upload, async (req, res) => {
   const file = req?.file;
   const history = req.body.history;
   const userText = req.body?.text;
-  const grammarTypescript = req.body.grammar;
+  const grammarTypescript = req.body?.grammar;
 
   if (!history) {
     res.status(400).send('Missing history');
@@ -47,11 +47,6 @@ app.post('/chat', upload, async (req, res) => {
 
   if (!userText && !file) {
     res.status(400).send('Missing text or file');
-    return;
-  }
-
-  if (!grammarTypescript) {
-    res.status(400).send('Missing grammar');
     return;
   }
 
@@ -71,41 +66,56 @@ app.post('/chat', upload, async (req, res) => {
     const getLlamaText = async () => {
       const text = await llamaRequest({text: inputText, history, grammar})
 
-      const parsedJson = () => {
-        try {
-          return JSON.parse(text);
-        } catch (error) {
+      if (grammar && grammar !== '') {
+        const parsedJson = () => {
+          try {
+            return JSON.parse(text);
+          } catch (error) {
+            return null;
+          }
+        }
+
+        if (numRetries >= retries) {
+          console.error('Retries exceeded');
           return null;
+        }
+
+        if (!parsedJson() && numRetries < retries) {
+          numRetries++;
+          console.log('Retrying...');
+          return getLlamaText();
+        } else {
+          return parsedJson();
         }
       }
 
-      if (numRetries >= retries) {
-        console.error('Retries exceeded');
-        return null;
-      }
+      return text;
+    }
 
-      if (!parsedJson() && numRetries < retries) {
-        numRetries++;
-        console.log('Retrying...');
-        return getLlamaText();
-      } else {
-        return parsedJson();
+    const llamaText = await getLlamaText();
+
+    const isJson = (value) => {
+      try {
+        JSON.parse(value);
+        return true;
+      } catch (error) {
+        return false;
       }
     }
 
-    const llamaTextJson = await getLlamaText();
+    const isLlamaTextJson = isJson(llamaText);
     
-    if (!llamaTextJson) {
+    if (!llamaText) {
       res.status(500).send('Invalid response from LLM');
       return;
     }
 
-    if (llamaTextJson?.message === undefined || llamaTextJson?.message === '') {
+    if (isLlamaTextJson && (llamaTextJson?.message === undefined || llamaTextJson?.message === '')) {
       res.status(500).send('Empty response from LLM');
       return;
     }
 
-    const tts = await ttsRequest(llamaTextJson?.message);
+    const tts = await ttsRequest(llamaText?.message ?? llamaText);
 
     res.writeHead(200, {
       'Content-Type': 'application/json'
@@ -113,7 +123,7 @@ app.post('/chat', upload, async (req, res) => {
 
     res.end(JSON.stringify({
       sttText: inputText,
-      llamaText: llamaTextJson,
+      llamaText: llamaText,
       wavData: Buffer.from(tts).toString('base64')
     }));
   } catch (error) {
