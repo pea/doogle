@@ -157,7 +157,7 @@ app.post('/tts', async (req, res) => {
 });
 
 function sttRequest(fileBuffer) {
-  const url = "http://192.168.1.131:6060/inference";
+  const url = "http://whisper:6060/inference";
   
   const blob = new Blob([fileBuffer], { type: 'audio/wav' });
 
@@ -201,7 +201,7 @@ async function llamaRequest({text, history, grammar}) {
     'prompt': prompt
   };
 
-  const response = await axios.post('http://192.168.1.131:7000/completion', data, {
+  const response = await axios.post('http://llamacpp:7000/completion', data, {
     headers: {
       'Accept': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -213,7 +213,7 @@ async function llamaRequest({text, history, grammar}) {
 }
 
 function ttsRequest(text) {
-  const url = 'http://192.168.1.131:5002/api/tts';
+  const url = 'http://tts:5002/api/tts';
   const params = {
     text: text,
     speaker_id: 'p226',
@@ -234,7 +234,7 @@ function ttsRequest(text) {
 
 
 const tortoiseTtsRequest = async (text) => {
-  const url = 'http://192.168.1.131:6700/stream';
+  const url = 'http://tortoise:6700/stream';
   const params = {
     text: text,
     voice: 'pat2'

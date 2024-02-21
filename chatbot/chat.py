@@ -24,8 +24,15 @@ import threading
 import queue
 import sys
 from helpers import is_json
+import argparse
 
-debug = sys.argv[1] == "debug" if len(sys.argv) > 1 else False
+parser = argparse.ArgumentParser()
+parser.add_argument('--apihost', type=str, default='192.168.0.131')
+parser.add_argument('--debug', type=bool, default=False)
+args = parser.parse_args()
+
+debug = args.debug
+apihost = args.apihost
 
 try:
   import RPi.GPIO as GPIO
@@ -268,7 +275,7 @@ class ChatBot:
         print(data)
 
       response = requests.post(
-        'http://192.168.1.131:4000/chat',
+        f'http://{apihost}:4000/chat',
         headers=None,
         files=files,
         data=data
@@ -288,7 +295,7 @@ class ChatBot:
         print(data)
 
       response = requests.post(
-        'http://192.168.1.131:4000/chat',
+        f'http://{apihost}:4000/chat',
         headers=None,
         json=data
       )
@@ -406,7 +413,11 @@ class ChatBot:
       'text': text
     }
     
-    response = requests.post('http://192.168.1.131:4000/tts', headers=None, json=data)
+    response = requests.post(
+      f'http://{apihost}:4000/tts',
+      headers=None,
+      json=data
+    )
     
     if response.status_code != 200:
       return
@@ -424,7 +435,11 @@ class ChatBot:
       'file': wavDataBytes
     }
 
-    response = requests.post('http://192.168.1.131:6060/inference', headers=None, files=files)
+    response = requests.post(
+      f'http://{apihost}:6060/inference',
+      headers=None,
+      files=files
+    )
 
     if response.status_code != 200:
       self.tts(response.text)

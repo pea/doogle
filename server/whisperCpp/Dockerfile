@@ -44,5 +44,5 @@ RUN apt-get update && \
 
 COPY --from=build /app /app
 
-CMD ["/app/server", "--host", "0.0.0.0", "--model", "models/ggml-small.en.bin"]
+CMD ["/app/server", "--host", "0.0.0.0", "--port", "6060", "--model", "models/ggml-small.en.bin"]
 

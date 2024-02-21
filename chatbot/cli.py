@@ -9,8 +9,15 @@ import json
 from prompt import prompt
 import subprocess
 import sys
+import argparse
 
-debug = sys.argv[1] == "debug" if len(sys.argv) > 1 else False
+parser = argparse.ArgumentParser()
+parser.add_argument('--apihost', type=str, default='192.168.0.131')
+parser.add_argument('--debug', type=bool, default=False)
+args = parser.parse_args()
+
+debug = args.debug
+apihost = args.apihost
 
 def message_request(history, userText, grammar):
   data = {
@@ -22,7 +29,7 @@ def message_request(history, userText, grammar):
   if debug:
     print(data)
 
-  return requests.post('http://192.168.1.131:4000/chat', headers=None, json=data)
+  return requests.post(f'http://{apihost}:4000/chat', headers=None, json=data)
 
 while True:
   userText = input("\033[32mYou:\033[0m ")
