@@ -17,7 +17,7 @@ services:
       dockerfile: 'Dockerfile'
     ports:
       - '7000:7000'
-    command: '--server -m /models/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
+    command: '--server -m /models/mistral-7b-instruct-v0.1.Q8_0.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
     restart: 'always'
     networks:
       - network

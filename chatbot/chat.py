@@ -68,7 +68,10 @@ class ChatBot:
 
     wakeword_function_models.append('./models/hey_doogle.tflite')
 
-    self.owwModel = Model(wakeword_models=wakeword_function_models, inference_framework="tflite")
+    self.owwModel = Model(
+      wakeword_models=wakeword_function_models,
+      inference_framework="tflite"
+    )
 
     try:
       self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
@@ -183,7 +186,7 @@ class ChatBot:
       GPIO.setmode(GPIO.BCM)
       GPIO.setup(en_pin, GPIO.OUT)
       GPIO.output(en_pin, GPIO.LOW)
-      pixel_ring.set_brightness(1)
+      pixel_ring.set_brightness(2)
       pixel_ring.set_color_palette(self.colour('cyan'), self.colour('black'))
       pixel_ring.trace()
 
@@ -278,7 +281,8 @@ class ChatBot:
         f'http://{apihost}:4000/chat',
         headers=None,
         files=files,
-        data=data
+        data=data,
+        timeout=15
       )
 
       self.recording = None
@@ -297,7 +301,8 @@ class ChatBot:
       response = requests.post(
         f'http://{apihost}:4000/chat',
         headers=None,
-        json=data
+        json=data,
+        timeout=15
       )
 
     # self.stop_pulse_leds()
@@ -416,7 +421,8 @@ class ChatBot:
     response = requests.post(
       f'http://{apihost}:4000/tts',
       headers=None,
-      json=data
+      json=data,
+      timeout=15
     )
     
     if response.status_code != 200:
@@ -438,7 +444,8 @@ class ChatBot:
     response = requests.post(
       f'http://{apihost}:6060/inference',
       headers=None,
-      files=files
+      files=files,
+      timeout=15
     )
 
     if response.status_code != 200:

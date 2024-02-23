@@ -32,6 +32,8 @@ instance = vlc.Instance()
 # Create a media player
 player = instance.media_player_new()
 
+player.audio_set_volume(100)
+
 # Create a Media instance
 media = instance.media_new(url)
 

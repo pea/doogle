@@ -75,6 +75,12 @@ Reboot the Raspberry Pi.
 
 `sudo reboot`
 
+### Update chatbot dependencies
+
+```
+pip install --upgrade -r requirements.txt
+```
+
 ### Functions
 
 To add a function, create a new item in `functions.json`.
