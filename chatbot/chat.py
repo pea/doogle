@@ -20,11 +20,8 @@ from functions import get_functions_by_type
 from functions import trigger_words_detected
 from prompt import prompt
 import io
-import threading
-import queue
-import sys
-from helpers import is_json
 import argparse
+import logging
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--apihost', type=str, default='192.168.0.131')
@@ -33,6 +30,13 @@ args = parser.parse_args()
 
 debug = args.debug
 apihost = args.apihost
+
+if os.path.isfile('chat.log'):
+  os.remove('chat.log')
+
+logging.basicConfig(filename='chat.log', level=logging.INFO, 
+                    format='%(asctime)s %(levelname)s: %(message)s', 
+                    datefmt='%m/%d/%Y %I:%M:%S %p')
 
 try:
   import RPi.GPIO as GPIO
@@ -109,11 +113,11 @@ class ChatBot:
     if voice_detected:
       self.time_last_voice_detected = time.time()
     else:
-      if time.time() - self.time_last_voice_detected > 2:
-        if self.recording is not None:
+      if time.time() - self.time_last_voice_detected > 1:
+        if self.recording is not None and self.is_recording:
           self.play_audio("sound/close.wav", 100)
-          self.handle_recording()
-          self.resume_media()
+          threading.Thread(target=self.handle_recording).start()
+          threading.Thread(target=self.resume_media).start()
           self.should_record = False
           self.is_recording = False
           self.time_started_recording = 0
@@ -135,7 +139,7 @@ class ChatBot:
       if self.time_started_recording == 0:
         self.time_started_recording = time.time()
 
-      self.pause_media()
+      threading.Thread(target=self.pause_media).start()
       if self.recording is None:
           self.recording = data
       else:
@@ -147,8 +151,8 @@ class ChatBot:
 
     if self.is_recording and time.time() - self.time_started_recording > 10:
       self.play_audio("sound/close.wav", 100)
-      self.handle_recording()
-      self.resume_media()
+      threading.Thread(target=self.handle_recording).start()
+      threading.Thread(target=self.resume_media).start()
       self.should_record = False
       self.is_recording = False
       self.time_started_recording = 0
@@ -275,7 +279,7 @@ class ChatBot:
       }
 
       if debug:
-        print(data)
+        logging.info(data)
 
       response = requests.post(
         f'http://{apihost}:4000/chat',
@@ -296,7 +300,7 @@ class ChatBot:
       }
 
       if debug:
-        print(data)
+        logging.info(data)
 
       response = requests.post(
         f'http://{apihost}:4000/chat',
@@ -313,13 +317,15 @@ class ChatBot:
 
     if response.status_code != 200:
       self.tts("There was an error with a request. " + response.text)
+      if debug:
+        logging.error(response)
 
     response_json = json.loads(response.text)
 
     if debug:
       debug_response = response_json.copy()
       debug_response['wavData'] = "WAV DATA"
-      print(debug_response)
+      logging.info(debug_response)
 
     llamaText = response_json['llamaText']
 
@@ -327,19 +333,28 @@ class ChatBot:
     function = "None"
     option = "None"
 
-    if not isinstance(llamaText, str):
-      llamaText_json = llamaText
-      message = llamaText_json['message']
-      function = llamaText_json['function']
-      option = llamaText_json['option']
+    try:
+      if not isinstance(llamaText, str):
+        llamaText_json = llamaText
+        message = llamaText_json['message']
+        function = llamaText_json['function']
+        option = llamaText_json['option']
 
-    sttText = response_json['sttText']
-    wavData = response_json['wavData']
-    wavDataBytes = base64.b64decode(wavData)
+      sttText = response_json['sttText']
+      wavData = response_json['wavData']
+      wavDataBytes = base64.b64decode(wavData)
+    except:
+      self.tts("There was an error with a request. " + response.text)
+      if debug:
+        logging.error(response)
+      return None
     
     return (message, sttText, wavDataBytes, function, option)
   
   def handle_function(self, function, option):
+    if debug:
+      logging.info(f'Running function {function} with option {option}')
+
     run_function(function, option)
 
     function_response = None
@@ -350,6 +365,9 @@ class ChatBot:
     llm_response = self.llm_request(
       text="The response from the " + function + " function is: " + str(function_response) + ". Please inform me of it in plain English."
     )
+
+    if llm_response is None:
+      return
 
     message, sttText, wavDataBytes, function = llm_response
 
@@ -370,7 +388,6 @@ class ChatBot:
     message, sttText, wavDataBytes, function, option = llm_response
 
     self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
-
 
     if function != "None" and function != "none":
       functionObj = get_function(function)
@@ -450,6 +467,8 @@ class ChatBot:
 
     if response.status_code != 200:
       self.tts(response.text)
+      if debug:
+        logging.error(response)
       return
     
     return response.text
