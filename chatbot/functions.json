@@ -84,7 +84,7 @@
   },
   "timer": {
     "type": "command",
-    "prompt": "start a timer by setting option to the chosen number of minutes",
+    "prompt": "set a timer by setting option to the chosen number of minutes",
     "triggerWords": ["timer"],
     "command": "python3 functions/timer.py --time [option]",
     "optionExample": "10"
