@@ -9,12 +9,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--time', type=int, default=10)
 args = parser.parse_args()
 
+time_in_minutes = args.time
+time_in_seconds = round(time_in_minutes * 60)
+
 def tts(text):
   data = {
     'text': text
   }
   
-  response = requests.post('http://192.168.1.131:4000/tts', headers=None, json=data, timeout=10)
+  response = requests.post('http://192.168.0.131:4000/tts', headers=None, json=data, timeout=10)
   
   if response.status_code != 200:
     return
@@ -32,28 +35,26 @@ def play_pause_media():
     pass
 
 def play_alert():
-  subprocess.run(["ffplay", "-volume", "256", "-nodisp", "-autoexit", 'sound/start.wav'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+  subprocess.run(["ffplay", "-volume", "256", "-nodisp", "-autoexit", 'sound/alarm.wav'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-time_in_minutes = round(args.time / 60)
-time_in_seconds = round(args.time % 60)
 
 time_readable = ''
-if time_in_minutes > 1:
-  time_readable = f'{time_in_minutes} minutes'
+if time_in_minutes >= 1:
+  time_readable = f'{time_in_minutes} minute'
+  if time_in_minutes > 1:
+    time_readable += 's'
 else:
   time_readable = f'{time_in_seconds} seconds'
 
 def timer_thread():
   play_pause_media()
 
-  play_alert()
-
   print(f'Starting timer for {time_readable}')
   tts(f'Starting timer for {time_readable}')
 
   play_pause_media()
 
-  subprocess.run(["sleep", str(args.time)])
+  subprocess.run(["sleep", str(time_in_seconds)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
   play_pause_media()
   
@@ -64,7 +65,7 @@ def timer_thread():
 
   for _ in range(3):
     play_alert()
-    time.sleep(2)
+    time.sleep(1)
 
   play_pause_media()
 

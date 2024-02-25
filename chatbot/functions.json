@@ -80,7 +80,14 @@
   "tenMinuteTimer": {
     "type": "wakeword",
     "model": "ten_minute_timer",
-    "command": "python3 functions/timer.py --time 600"
+    "command": "python3 functions/timer.py --time 10"
+  },
+  "timer": {
+    "type": "command",
+    "prompt": "start a timer by setting option to the chosen number of minutes",
+    "triggerWords": ["timer"],
+    "command": "python3 functions/timer.py --time [option]",
+    "optionExample": "10"
   },
   "turnTheLightsOn": {
     "type": "wakeword",

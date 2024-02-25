@@ -318,7 +318,10 @@ class ChatBot:
     if response.status_code != 200:
       self.tts("There was an error with a request. " + response.text)
       if debug:
-        logging.error(response)
+        logging.info('Headers: %s', response.headers)
+        logging.info('Status code: %s', response.status_code)
+        logging.info('Body: %s', response.text)
+        logging.info('Request: %s', response.request.body)
 
     response_json = json.loads(response.text)
 
@@ -346,7 +349,10 @@ class ChatBot:
     except:
       self.tts("There was an error with a request. " + response.text)
       if debug:
-        logging.error(response)
+        logging.info('Headers: %s', response.headers)
+        logging.info('Status code: %s', response.status_code)
+        logging.info('Body: %s', response.text)
+        logging.info('Request: %s', response.request.body)
       return None
     
     return (message, sttText, wavDataBytes, function, option)
@@ -468,7 +474,10 @@ class ChatBot:
     if response.status_code != 200:
       self.tts(response.text)
       if debug:
-        logging.error(response)
+        logging.info('Headers: %s', response.headers)
+        logging.info('Status code: %s', response.status_code)
+        logging.info('Body: %s', response.text)
+        logging.info('Request: %s', response.request.body)
       return
     
     return response.text

@@ -115,7 +115,7 @@ app.post('/chat', upload, async (req, res) => {
       return;
     }
 
-    const tts = await ttsRequest(llamaText?.message ?? llamaText);
+    const tts = await ttsRequest(llamaText?.message ?? llamaText ?? 'ok');
 
     res.writeHead(200, {
       'Content-Type': 'application/json'
