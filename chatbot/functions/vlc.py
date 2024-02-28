@@ -10,6 +10,7 @@ args = parser.parse_args()
 
 def play_media(url):
   subprocess.run("pkill vlc", shell=True, executable="/bin/bash")
+  time.sleep(0.5)
   subprocess.run(["vlc", "--intf", "rc", "--rc-host", "localhost:12345", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def stop_media():

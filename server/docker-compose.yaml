@@ -8,6 +8,8 @@ services:
     ports:
       - '4000:4000'
     restart: 'always'
+    logging:
+      driver: none
     networks:
       - network
 
@@ -17,10 +19,12 @@ services:
       dockerfile: 'Dockerfile'
     ports:
       - '7000:7000'
-    command: '--server -m /models/mistral-7b-instruct-v0.1.Q8_0.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
+    command: '--server -m /models/mistral-7b-instruct-v0.2.Q8_0.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
     restart: 'always'
     networks:
       - network
+    logging:
+      driver: none
     deploy:
       resources:
         reservations:
@@ -39,6 +43,8 @@ services:
     restart: 'always'
     networks:
       - network
+    logging:
+      driver: none
     deploy:
       resources:
         reservations:
@@ -57,6 +63,8 @@ services:
     restart: 'always'
     networks:
       - network
+    logging:
+      driver: none
     deploy:
       resources:
         reservations:
@@ -97,6 +105,8 @@ services:
   #   restart: 'always'
   #  networks:
   #    - network
+  #  logging:
+  #    driver: none
   #   deploy:
   #     resources:
   #       reservations:

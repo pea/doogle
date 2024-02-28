@@ -1,4 +1,5 @@
 #!/bin/bash
+
 if pgrep -x "chat.py" > /dev/null
 then
     echo "Doogle is already running."

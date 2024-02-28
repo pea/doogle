@@ -268,8 +268,13 @@ class ChatBot:
       userStt = self.sst(recording_wav)
       new_prompt = prompt(userText=userStt)
 
+      if debug:
+        logging.info(f'User STT: {userStt}')
+
       if len(trigger_words_detected(userStt)) > 0:
         grammar = grammar_types()
+        if debug:
+          logging.info(f'Trigger words detected: {trigger_words_detected(userStt)}')
       else:
         grammar = ""
 
@@ -397,6 +402,8 @@ class ChatBot:
 
     if function != "None" and function != "none":
       functionObj = get_function(function)
+      if debug:
+        logging.info(f'Function object: {functionObj}')
       if functionObj['type'] == 'command':
         self.handle_function(function, option)
         return
@@ -472,7 +479,8 @@ class ChatBot:
     )
 
     if response.status_code != 200:
-      self.tts(response.text)
+      if response.text is not None:
+        self.tts(response.text)
       if debug:
         logging.info('Headers: %s', response.headers)
         logging.info('Status code: %s', response.status_code)

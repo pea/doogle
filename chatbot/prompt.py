@@ -8,11 +8,34 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 
 functions_json_file = os.path.join(base_dir, 'functions.json')
 
+def trigger_words_detected(userText):
+  detected = False
+  with open(functions_json_file) as f:
+      functions_json = json.load(f)
+
+  for key, item in functions_json.items():
+    function = item
+    try:
+      trigger_words_array = function['triggerWords']
+      if trigger_words_array is None:
+        continue
+      for trigger_word in trigger_words_array:
+        if trigger_word in userText:
+          detected = True
+          break
+    except:
+      continue
+
+  return detected
+
 def prompt(userText = None):
   with open(functions_json_file) as f:
       functions_json = json.load(f)
 
   prompt = "This is a chat between a user and Doogle.\n"
+
+  if trigger_words_detected(userText):
+    prompt = prompt + "Doogle can use tools by using the function parameter. Doogle ALWAYS sets a function in the function parameter when using a tool.\n"
 
   # Handle environment functions
   environment_functions = []
@@ -46,22 +69,22 @@ def prompt(userText = None):
     can_do_functions = []
     for function in matching_functions:
       if function['type'] == 'command':
-        can_do_functions.append("Doogle can " + function['prompt'])
+        can_do_functions.append("By setting the function to " + function['name'] + " Doogle can " + function['prompt'])
     can_do_functions = '.\n'.join(can_do_functions) if len(can_do_functions) > 0 else ""
     can_do_functions = can_do_functions if len(can_do_functions) > 0 else ""
     prompt = prompt + can_do_functions
     if len(can_do_functions) > 0:
       prompt = prompt + "\n"
 
-    # Handle function examples
-    function_examples = []
-    for function in matching_functions:
-      if function['type'] == 'command':
-        optionExample = function['optionExample'] if 'optionExample' in function else "None"
-        function_examples.append("User: " + function['prompt'] + ". \nDoogle: {'message': '', 'function': '" + function["name"] + "', 'options': '" + optionExample + "'}\n")
-    function_examples = ''.join(function_examples)
-    function_examples = function_examples + "\n" if len(function_examples) > 0 else ""
-    if len(function_examples) > 0:
-      prompt = prompt + function_examples
+    # # Handle function examples
+    # function_examples = []
+    # for function in matching_functions:
+    #   if function['type'] == 'command':
+    #     optionExample = function['optionExample'] if 'optionExample' in function else "None"
+    #     function_examples.append("User: " + function['prompt'] + ". \nDoogle: {'message': '', 'function': '" + function["name"] + "', 'options': '" + optionExample + "'}\n")
+    # function_examples = ''.join(function_examples)
+    # function_examples = function_examples + "\n" if len(function_examples) > 0 else ""
+    # if len(function_examples) > 0:
+    #   prompt = prompt + function_examples
 
   return prompt

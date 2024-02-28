@@ -2,13 +2,13 @@
   "lightsOn": {
     "type": "command",
     "prompt": "force turn on the lights",
-    "triggerWords": ["lights"],
+    "triggerWords": ["lights", "light"],
     "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
   },
   "lightsOff": {
     "type": "command",
     "prompt": "force turn off the lights",
-    "triggerWords": ["lights"],
+    "triggerWords": ["lights", "light"],
     "command": ".venv/bin/python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
   },
   "playNtsRadioOne": {
@@ -28,6 +28,12 @@
     "prompt": "CAN play NTS radio stations including NTS radio expansions",
     "triggerWords": ["radio", "play", "nts"],
     "command": "python3 functions/vlc.py --url https://stream-mixtape-geo.ntslive.net/mixtape3?client=NTSWebApp&t=1706890892205"
+  },
+  "playVoicesRadio": {
+    "type": "command",
+    "prompt": "CAN play voices radio",
+    "triggerWords": ["radio", "play", "voices"],
+    "command": "python3 functions/vlc.py --url https://voicesradio.out.airtime.pro/voicesradio_a"
   },
   "playJazzMusic": {
     "type": "command",
@@ -76,11 +82,6 @@
     "prompt": "restart yourself",
     "triggerWords": ["restart"],
     "command": "python3 functions/restart.py"
-  },
-  "tenMinuteTimer": {
-    "type": "wakeword",
-    "model": "ten_minute_timer",
-    "command": "python3 functions/timer.py --time 10"
   },
   "timer": {
     "type": "command",

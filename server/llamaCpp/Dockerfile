@@ -41,7 +41,7 @@ RUN mkdir /models
 # RUN wget -O /models/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf "https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGUF/resolve/main/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf?download=true"
 
 # Mistral-7B-Instruct-v0.1-GGUF
-RUN wget -O /models/mistral-7b-instruct-v0.1.Q8_0.gguf "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q8_0.gguf?download=true"
+RUN wget -O /models/mistral-7b-instruct-v0.2.Q8_0.gguf "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q8_0.gguf?download=true"
 
 ENTRYPOINT ["/app/.devops/tools.sh"]
 

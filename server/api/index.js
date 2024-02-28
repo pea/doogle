@@ -60,8 +60,8 @@ app.post('/chat', upload, async (req, res) => {
 
     const inputText = stt ?? userText;
 
-    const retries = 3;
-    let numRetries = 0;
+    const maxRetries = 10;
+    let retryCount = 0;
 
     const getLlamaText = async () => {
       const text = await llamaRequest({text: inputText, history, grammar})
@@ -69,24 +69,29 @@ app.post('/chat', upload, async (req, res) => {
       if (grammar && grammar !== '') {
         const parsedJson = () => {
           try {
-            return JSON.parse(text);
+            return JSON.parse(text)
           } catch (error) {
-            return null;
+            return null
           }
         }
 
-        if (numRetries >= retries) {
-          console.error('Retries exceeded');
-          return null;
+        if (retryCount >= maxRetries) {
+          return null
         }
 
-        if (!parsedJson() && numRetries < retries) {
-          numRetries++;
-          console.log('Retrying...');
-          return getLlamaText();
-        } else {
-          return parsedJson();
+        const jsonResponse = parsedJson();
+
+        if (!jsonResponse) {
+          retryCount++;
+          return getLlamaText()
         }
+
+        if (jsonResponse?.function === undefined) {
+          retryCount++;
+          return getLlamaText()
+        }
+
+        return jsonResponse
       }
 
       return text;
@@ -106,16 +111,23 @@ app.post('/chat', upload, async (req, res) => {
     const isLlamaTextJson = isJson(llamaText);
     
     if (!llamaText) {
-      res.status(500).send('Invalid response from LLM');
+      res.status(500).send('Invalid response from language model');
       return;
     }
 
     if (isLlamaTextJson && (llamaTextJson?.message === undefined || llamaTextJson?.message === '')) {
-      res.status(500).send('Empty response from LLM');
+      res.status(500).send('Empty response from language model');
       return;
     }
 
-    const tts = await ttsRequest(llamaText?.message ?? llamaText ?? 'ok');
+    const emptyWavData = Buffer.from(new Uint8Array()).toString('base64');
+    let tts = emptyWavData
+
+    const llamaMessage = llamaText?.message ?? llamaText
+
+    if (!!llamaMessage && llamaMessage !== "") {
+      tts = await ttsRequest(llamaMessage)
+    }
 
     res.writeHead(200, {
       'Content-Type': 'application/json'
@@ -135,13 +147,13 @@ app.post('/chat', upload, async (req, res) => {
 app.post('/tts', async (req, res) => {
   const text = req.body?.text;
 
-  if (!text) {
+  if (!text && text === '') {
     res.status(400).send('Missing text');
     return;
   }
 
   try {
-    const tts = await ttsRequest(text);
+    const tts = await ttsRequest(text ?? 'ok');
 
     res.writeHead(200, {
       'Content-Type': 'application/json'
@@ -215,7 +227,7 @@ async function llamaRequest({text, history, grammar}) {
 function ttsRequest(text) {
   const url = 'http://tts:5002/api/tts';
   const params = {
-    text: text,
+    text: !!text && text !== '' ? text : 'No text provided to text-to-speech api',
     speaker_id: 'p226',
     style_wav: '',
     language_id: ''

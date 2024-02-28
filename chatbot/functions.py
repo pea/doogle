@@ -84,8 +84,9 @@ def grammar_types():
 
     enum_string = "enum Functions {\n"
     enum_string += "  None = \"None\",\n"
-    for function in data.keys():
-        enum_string += f"  {function} = \"{function}\",\n"
+    for key, item in data.items():
+      if item['type'] == 'command':
+        enum_string += f"  {key} = \"{key}\",\n"
     enum_string += "}\n"
 
     interface_string = """
