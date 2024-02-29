@@ -4,10 +4,26 @@
 
 Smart speaker designed to replace the big tech alternatives. The heavy lifting is designed to be done by a server with a GPU running Llama.cpp, Whisper.cpp and TTS, and a Raspberry Pi does the audio input and output, as well as control any peripherals like RF transceivers.
 
+## Contents
+- [Features](#features)
+- [Installation](#installation)
+  - [Server](#server)
+  - [Chatbot](#chatbot)
+  - [Volume](#volume)
+  - [Respeaker](#respeaker)
+  - [Debugging](#debugging)
+
 ## Features
-- Wake word ("Hey Doogle")
+- Wake words ("Hey Doogle")
 - Voice chat and text chat
-- Functions
+- Functions using LLM
+  - Control 433 Mhz remote control sockets
+  - Internet radio
+  - Timer
+  - Volume control
+- Functions using wake words
+- Functions that populate the prompt (like the time)
+- Designed for reSpeaker 4-Mic Array
 
 ## Installation
 
@@ -120,33 +136,3 @@ The Doogle chatbot can be used with a standard USB microphone, but it's designed
 `cd ~/doogle/chatbot`
 `pkill chat.py && .venv/bin/python3 chat.py debug`
 
-## Wake Words
-
-# Turn the lights on
-
-Settings used
-```
-config["target_phrase"] = ["turn the lights on", "Doogle lights on", "lights on"]
-config["custom_negative_phrases"] = ["turn the lights off", "Doogle lights off", "lights off"]
-config["n_samples"] = 100000
-config["n_samples_val"] = 2000
-config["steps"] = 100000
-config["target_accuracy"] = 0.7
-config["target_recall"] = 0.5
-config["target_false_positives_per_hour"] = 0.2
-config["max_negative_weight"] = 1000
-```
-
-# Turn the lights off
-
-```
-config["target_phrase"] = ["turn the lights off", "Doogle lights off", "lights off"]
-config["custom_negative_phrases"] = ["turn the lights on", "Doogle lights on", "lights on"]
-config["n_samples"] = 100000
-config["n_samples_val"] = 2000
-config["steps"] = 100000
-config["target_accuracy"] = 0.7
-config["target_recall"] = 0.5
-config["target_false_positives_per_hour"] = 0.2
-config["max_negative_weight"] = 1000
-```

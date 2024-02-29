@@ -97,7 +97,7 @@ class ChatBot:
     function_wakeword_scores = {}
 
     for wakeword_function in self.wakeword_functions:
-      if prediction[self.wakeword_functions[wakeword_function]['model']] > 0.5:
+      if prediction[self.wakeword_functions[wakeword_function]['model']] > 0.6:
         function_wakeword_scores[wakeword_function] = prediction[self.wakeword_functions[wakeword_function]['model']]
         detected_function_wakeword = True
 
