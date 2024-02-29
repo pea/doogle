@@ -13,13 +13,13 @@
   },
   "playNtsRadioOne": {
     "type": "command",
-    "prompt": "CAN play NTS radio stations including NTS radio one",
+    "prompt": "CAN play NTS radio stations including NTS radio 1",
     "triggerWords": ["radio", "play", "nts"],
     "command": "python3 functions/vlc.py --url http://stream-relay-geo.ntslive.net/stream"
   },
   "playNtsRadioTwo": {
     "type": "command",
-    "prompt": "CAN play NTS radio stations including NTS radio two",
+    "prompt": "CAN play NTS radio stations including NTS radio 2",
     "triggerWords": ["radio", "play", "nts"],
     "command": "python3 functions/vlc.py --url http://stream-relay-geo.ntslive.net/stream2"
   },
@@ -67,7 +67,7 @@
   },
   "time": {
     "type": "environment",
-    "prompt": "the current time IS AVAILABLE. The current time IS SET to [function_response]",
+    "prompt": "The time is [function_response]",
     "command": "python3 functions/time.py"
   },
   "volume": {
@@ -92,12 +92,12 @@
   },
   "turnTheLightsOn": {
     "type": "wakeword",
-    "model": "turn_the_lights_on",
+    "model": "doogle_lights_on",
     "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
   },
   "turnTheLightsOff": {
     "type": "wakeword",
-    "model": "turn_the_lights_off",
+    "model": "doogle_lights_off",
     "command": ".venv/bin/python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
   }
 }

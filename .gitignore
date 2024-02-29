@@ -3,3 +3,4 @@ recording.wav
 recording.tmp.wav
 __pycache__/
 node_modules/
+chat.log

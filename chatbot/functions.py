@@ -17,12 +17,7 @@ def run_function(function_name, option=None):
         stop_thread.set()
         function_thread.join()
 
-    # Reset the stop_thread event
-    stop_thread.clear()
-
-    # Start a new function_thread
-    function_thread = threading.Thread(target=execute_function, args=(function_name, option), name='function_thread')
-    function_thread.start()
+    execute_function(function_name, option)
 
 def execute_function(function_name, option):
     if function_name == "none":
@@ -69,7 +64,7 @@ def trigger_words_detected(userText):
       if trigger_words_array is None:
         continue
       for trigger_word in trigger_words_array:
-        if trigger_word in userText:
+        if trigger_word in userText.lower():
           function['name'] = key
           matching_functions.append(function)
           break

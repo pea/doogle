@@ -97,7 +97,7 @@ class ChatBot:
     function_wakeword_scores = {}
 
     for wakeword_function in self.wakeword_functions:
-      if prediction[self.wakeword_functions[wakeword_function]['model']] > 0.1:
+      if prediction[self.wakeword_functions[wakeword_function]['model']] > 0.5:
         function_wakeword_scores[wakeword_function] = prediction[self.wakeword_functions[wakeword_function]['model']]
         detected_function_wakeword = True
 
@@ -266,15 +266,19 @@ class ChatBot:
       }
 
       userStt = self.sst(recording_wav)
+
       new_prompt = prompt(userText=userStt)
 
       if debug:
         logging.info(f'User STT: {userStt}')
 
-      if len(trigger_words_detected(userStt)) > 0:
+      numTriggerWordsDetected = len(trigger_words_detected(userStt))
+
+      if debug:
+          logging.info(f'Trigger words detected: {str(numTriggerWordsDetected)} from text {userStt}')
+
+      if numTriggerWordsDetected > 0:
         grammar = grammar_types()
-        if debug:
-          logging.info(f'Trigger words detected: {trigger_words_detected(userStt)}')
       else:
         grammar = ""
 
@@ -382,10 +386,11 @@ class ChatBot:
 
     message, sttText, wavDataBytes, function = llm_response
 
-    self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
-    self.pause_media()
-    self.play_audio(wavDataBytes)
-    self.resume_media()
+    if (sttText is not None and sttText is not ""):
+      self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
+      self.pause_media()
+      self.play_audio(wavDataBytes)
+      self.resume_media()
   
   def handle_recording(self):
     if self.recording is None:
@@ -488,7 +493,10 @@ class ChatBot:
         logging.info('Request: %s', response.request.body)
       return
     
-    return response.text
+
+    responseJson = json.loads(response.text)
+    text = responseJson['text']
+    return text
 
   def start(self):
     self.stream = self.p.open(

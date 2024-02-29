@@ -32,7 +32,7 @@ def prompt(userText = None):
   with open(functions_json_file) as f:
       functions_json = json.load(f)
 
-  prompt = "This is a chat between a user and Doogle.\n"
+  prompt = "This is a chat between a user and Doogle. Doogle's responses are short.\n"
 
   if trigger_words_detected(userText):
     prompt = prompt + "Doogle can use tools by using the function parameter. Doogle ALWAYS sets a function in the function parameter when using a tool.\n"

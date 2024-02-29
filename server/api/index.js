@@ -11,6 +11,10 @@ app.use(express.json());
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage }).single('audio');
 
+app.get('/', (req, res) => {
+  res.send('Hey')
+}
+
 app.post('/message', async (req, res) => {
   const history = req.body?.history;
   const text = req.body?.text;
