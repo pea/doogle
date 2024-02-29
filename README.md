@@ -91,35 +91,55 @@ Reboot the Raspberry Pi.
 
 `sudo reboot`
 
-### Update chatbot dependencies
-
-```
-pip install --upgrade -r requirements.txt
-```
-
 ### Functions
 
 To add a function, create a new item in `functions.json`.
 
-index: the text ID of the function
-Type: "environment" or "command". `command` phrases the instruction as "Doogle can..", `environment` phrases the instruction as "the time is..". Add [function_response] to the prompt to have the response from the function inserted into the environment-type prompt.
-triggerWords: When any of these words are spoken by the user, the function prompt will be added. This allows for many functions without bogging down the request with a long prompt.
-command: The command to run when the function is triggered. The command can return a response in any format - Doogle will read it in plain English.
+#### Command-type function
+
+```
+"lightsOn": {
+  "type": "command",
+  "prompt": "force turn on the lights",
+  "triggerWords": ["lights", "light"],
+  "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
+}
+```
+
+- `index`: the text ID of the function
+- `prompt`: the prompt to be added to the chatbot when the function is triggered by the triggerWord
+- `triggerWords`: When any of these words are spoken by the user, the function prompt will be added. This allows for many functions without bogging down the request with a long prompt.
+- `command`: The command to run when the function is triggered.
+
+#### Environment-type function
 
 ```
 "time": {
   "type": "environment",
-  "prompt": "the time is [function_response]",
-  "triggerWords": ["time"],
+  "prompt": "The time is [function_response]",
   "command": "python3 functions/time.py"
 }
 ```
 
-## Volume
+- `index`: the text ID of the function
+- `prompt`: the prompt to be added to the chatbot
+- `command`: The command to run, `[function_response]` will be replaced with the output of the command
 
-You might want to increase the mic gain and speaker volume on the Raspberry Pi. You can do this by running `alsamixer`.
+#### Wakeword-type function
 
-## Respeaker
+```
+"turnTheLightsOn": {
+  "type": "wakeword",
+  "model": "doogle_lights_on",
+  "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
+}
+```
+
+- `index`: the text ID of the function
+- `model`: the name of the model to use for the wake word contained in the `models` directory
+- `command`: The command to run when the function is triggered.
+
+## Respeaker Setup
 
 The Doogle chatbot can be used with a standard USB microphone, but it's designed to work with the ReSpeaker 4-Mic Array for Raspberry Pi. This is a 4-microphone array that can be used to detect the direction of sound and provides VAD capabilities. It's also a speaker, so it can be used to play audio.
 
