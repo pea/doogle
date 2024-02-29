@@ -21,7 +21,7 @@ Smart speaker designed to replace the big tech alternatives. The heavy lifting i
   - Internet radio
   - Timer
   - Volume control
-- Functions using wake words
+- Functions using wake words ("Lights on")
 - Functions that populate the prompt (like the time)
 - Designed for reSpeaker 4-Mic Array
 
