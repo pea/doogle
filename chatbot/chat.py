@@ -194,17 +194,6 @@ class ChatBot:
       pixel_ring.set_color_palette(self.colour('cyan'), self.colour('black'))
       pixel_ring.trace()
 
-      # def vad_direction():
-      #   while self.Mic_tuning is not None:
-      #     if self.Mic_tuning.is_voice():
-      #       pixel_ring.listen()
-      #       pixel_ring.set_color_palette(green, black)
-      #     else:
-      #       pixel_ring.set_color_palette(teal, black)
-      #     time.sleep(0.1)
-      
-      # threading.Thread(target=vad_direction).start()
-
   def start_pulse_leds(self):
     if self.Mic_tuning is None:
       return
@@ -253,7 +242,6 @@ class ChatBot:
     if recording is not None and text is not None:
       return
 
-    # self.start_pulse_leds()
     try:
       pixel_ring.spin()
     except:
@@ -318,7 +306,6 @@ class ChatBot:
         timeout=15
       )
 
-    # self.stop_pulse_leds()
     try:
       pixel_ring.trace()
     except:
