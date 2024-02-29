@@ -9,9 +9,12 @@ Smart speaker designed to replace the big tech alternatives. The heavy lifting i
 - [Installation](#installation)
   - [Server](#server)
   - [Chatbot](#chatbot)
-  - [Volume](#volume)
-  - [Respeaker](#respeaker)
-  - [Debugging](#debugging)
+- [Functions](#functions)
+  - [Command-type function](#command-type-function)
+  - [Environment-type function](#environment-type-function)
+  - [Wakeword-type function](#wakeword-type-function)
+- [Respeaker Setup](#respeaker-setup)
+- [Debugging](#debugging)
 
 ## Features
 - Wake words ("Hey Doogle")
@@ -91,7 +94,7 @@ Reboot the Raspberry Pi.
 
 `sudo reboot`
 
-### Functions
+#### Functions
 
 To add a function, create a new item in `functions.json`.
 
@@ -139,7 +142,7 @@ To add a function, create a new item in `functions.json`.
 - `model`: the name of the model to use for the wake word contained in the `models` directory
 - `command`: The command to run when the function is triggered.
 
-## Respeaker Setup
+#### Respeaker Setup
 
 The Doogle chatbot can be used with a standard USB microphone, but it's designed to work with the ReSpeaker 4-Mic Array for Raspberry Pi. This is a 4-microphone array that can be used to detect the direction of sound and provides VAD capabilities. It's also a speaker, so it can be used to play audio.
 
@@ -151,7 +154,7 @@ The Doogle chatbot can be used with a standard USB microphone, but it's designed
 - `sudo udevadm control --reload-rules`
 - `sudo udevadm trigger`
 
-## Debugging
+#### Debugging
 
 Update `DOOGLE_DEBUG` in .env to toggle debugging. Logs are stored in chat.log and cleared on each boot.
 
