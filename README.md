@@ -153,6 +153,5 @@ The Doogle chatbot can be used with a standard USB microphone, but it's designed
 
 ## Debugging
 
-`cd ~/doogle/chatbot`
-`pkill chat.py && .venv/bin/python3 chat.py debug`
+Update `DOOGLE_DEBUG` in .env to toggle debugging. Logs are stored in chat.log and cleared on each boot.
 
