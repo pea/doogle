@@ -1,10 +1,10 @@
 {
-  "lightsOn": {
-    "type": "command",
-    "prompt": "force turn on the lights",
-    "triggerWords": ["lights", "light"],
-    "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
-  },
+"lightsOn": {
+  "type": "command",
+  "prompt": "force turn on the lights",
+  "triggerWords": ["lights", "light"],
+  "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
+},
   "lightsOff": {
     "type": "command",
     "prompt": "force turn off the lights",
@@ -59,9 +59,15 @@
     "triggerWords": ["radio", "play", "jazz"],
     "command": "python3 functions/vlc.py --url https://edge-bauerall-01-gos2.sharp-stream.com/jazzhigh.aac"
   },
+  "playNews": {
+    "type": "command",
+    "prompt": "CAN play the news",
+    "triggerWords": ["radio", "play", "news"],
+    "command": "python3 functions/vlc.py --url https://live-hls-audio-web-aje.getaj.net/VOICE-AJE/index.m3u8 --volume 90"
+  },
   "stopMedia": {
     "type": "command",
-    "prompt": "stop the radio or stop the music or turn off the music or turn off the radio",
+    "prompt": "stop the radio or stop the music or turn off the music or turn off the radio or turn this off",
     "triggerWords": ["radio", "stop", "music"],
     "command": "python3 functions/vlc.py --stop true"
   },
@@ -90,11 +96,11 @@
     "command": "python3 functions/timer.py --time [option]",
     "optionExample": "10"
   },
-  "turnTheLightsOn": {
-    "type": "wakeword",
-    "model": "doogle_lights_on",
-    "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
-  },
+"turnTheLightsOn": {
+  "type": "wakeword",
+  "model": "doogle_lights_on",
+  "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
+},
   "turnTheLightsOff": {
     "type": "wakeword",
     "model": "doogle_lights_off",

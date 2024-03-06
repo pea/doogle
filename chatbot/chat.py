@@ -22,6 +22,7 @@ from prompt import prompt
 import io
 import argparse
 import logging
+import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--apihost', type=str, default='192.168.0.131')
@@ -85,8 +86,6 @@ class ChatBot:
 
     self.setup_leds()
 
-    self.change_media_volume(200)
-
   def stream_callback(self, in_data, frame_count, time_info, status):
     data = np.frombuffer(in_data, dtype=np.int16)
     prediction = self.owwModel.predict(np.frombuffer(data, dtype=np.int16))
@@ -115,19 +114,19 @@ class ChatBot:
     else:
       if time.time() - self.time_last_voice_detected > 1:
         if self.recording is not None and self.is_recording:
-          self.play_audio("sound/close.wav", 100)
+          self.play_audio("sound/close.wav", 70)
           threading.Thread(target=self.handle_recording).start()
           threading.Thread(target=self.resume_media).start()
           self.should_record = False
           self.is_recording = False
           self.time_started_recording = 0
 
-    if heyDoogleScore >= 0.1 and not detected_function_wakeword:
+    if heyDoogleScore >= 0.05 and not detected_function_wakeword:
       self.should_record = True
       self.time_last_voice_detected = time.time()
 
     if self.should_record and not self.is_recording:
-      self.play_audio("sound/open.wav", 100)
+      self.play_audio("sound/open.wav", 70)
       try:
         pixel_ring.listen()
       except:
@@ -150,7 +149,7 @@ class ChatBot:
           pass
 
     if self.is_recording and time.time() - self.time_started_recording > 10:
-      self.play_audio("sound/close.wav", 100)
+      self.play_audio("sound/close.wav", 70)
       threading.Thread(target=self.handle_recording).start()
       threading.Thread(target=self.resume_media).start()
       self.should_record = False
@@ -160,11 +159,11 @@ class ChatBot:
     if self.time_last_response != 0 and time.time() - self.time_last_response > 20 and self.recording is None:
       self.time_last_response = 0
       self.history = prompt()
-      self.play_audio("sound/reset.wav", 100)
+      self.play_audio("sound/reset.wav", 70)
 
     return (in_data, pyaudio.paContinue)
   
-  def play_audio(self, input, volume=256):
+  def play_audio(self, input, volume=100):
     if os.path.exists(input):
       subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
@@ -373,7 +372,12 @@ class ChatBot:
 
     message, sttText, wavDataBytes, function = llm_response
 
-    if (sttText is not None and sttText is not ""):
+    def strip_non_words(s):
+      s = re.sub(r'\[.*?\]', '', s)
+      s = re.sub(r'\s', '', s)
+      return s
+
+    if (strip_non_words(sttText) is not ""):
       self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
       self.pause_media()
       self.play_audio(wavDataBytes)
@@ -408,10 +412,6 @@ class ChatBot:
       self.pause_media()
       self.play_audio(wavDataBytes)
       self.resume_media()
-  
-  def change_media_volume(self, volume):
-    subprocess.run("echo 'volume " + str(volume) + "' > /dev/tcp/localhost/12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True, executable="/bin/bash")
-    subprocess.run("echo 'volume " + str(volume) + "' | nc localhost 12345", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
 
   def pause_media(self):
       if self.media_paused:
@@ -496,7 +496,7 @@ class ChatBot:
       stream_callback=self.stream_callback
     )
     self.stream.start_stream()
-    self.play_audio("sound/start.wav", 100)
+    self.play_audio("sound/start.wav", 70)
 
   def stop(self):
     if self.stream is not None:

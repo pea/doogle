@@ -27,6 +27,7 @@ Smart speaker designed to replace the big tech alternatives. The heavy lifting i
 - Functions using wake words ("Lights on")
 - Functions that populate the prompt (like the time)
 - Designed for reSpeaker 4-Mic Array
+- Easy server setup with Docker Compose
 
 ## Installation
 
@@ -43,6 +44,12 @@ Smart speaker designed to replace the big tech alternatives. The heavy lifting i
 4. Edit the dockerfiles as necessary (such as changing the models used, cuda versions, etc.)
 5. Run `docker compose up -d`
 6. Open port 4000 on your server
+
+Tested with:
+- Debain
+- RTX 3080 Ti
+- MSI X570-A PRO
+- 16GB RAM
 
 ### Chatbot
 
