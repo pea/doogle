@@ -34,14 +34,12 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 
 RUN make
 
-# Download the model
+# Download the models
 RUN mkdir /models
 
-# WizardLM-1.0-Uncensored-Llama2-13B-GGUF
-# RUN wget -O /models/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf "https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGUF/resolve/main/wizardlm-1.0-uncensored-llama2-13b.Q4_K_M.gguf?download=true"
+RUN wget -O /models/ggml-mistral-q_4_k.gguf "https://huggingface.co/cmp-nct/llava-1.6-gguf/resolve/main/ggml-mistral-q_4_k.gguf?download=true"
 
-# Mistral-7B-Instruct-v0.1-GGUF
-RUN wget -O /models/mistral-7b-instruct-v0.2.Q8_0.gguf "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q8_0.gguf?download=true"
+RUN wget -O /models/mmproj-mistral7b-f16.gguf "https://huggingface.co/cmp-nct/llava-1.6-gguf/resolve/main/mmproj-mistral7b-f16.gguf?download=true"
 
 ENTRYPOINT ["/app/.devops/tools.sh"]
 

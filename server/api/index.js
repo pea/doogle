@@ -9,11 +9,14 @@ const port = 4000
 app.use(express.json());
 
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage }).single('audio');
+const upload = multer({ storage: storage }).fields([
+  { name: 'audio', maxCount: 1 },
+  { name: 'image', maxCount: 1 }
+]);
 
 app.get('/', (req, res) => {
   res.send('Hey')
-}
+})
 
 app.post('/message', async (req, res) => {
   const history = req.body?.history;
@@ -39,7 +42,8 @@ app.post('/message', async (req, res) => {
 })
 
 app.post('/chat', upload, async (req, res) => {
-  const file = req?.file;
+  const audio = req.files?.['audio']?.[0]
+  const image = req.files?.['image']?.[0]
   const history = req.body.history;
   const userText = req.body?.text;
   const grammarTypescript = req.body?.grammar;
@@ -49,7 +53,7 @@ app.post('/chat', upload, async (req, res) => {
     return;
   }
 
-  if (!userText && !file) {
+  if (!userText && !audio) {
     res.status(400).send('Missing text or file');
     return;
   }
@@ -58,8 +62,8 @@ app.post('/chat', upload, async (req, res) => {
 
   try {
     let stt = null;
-    if (file) {
-      stt = await sttRequest(file.buffer);
+    if (audio) {
+      stt = await sttRequest(audio.buffer);
     }
 
     const inputText = stt ?? userText;
@@ -67,8 +71,10 @@ app.post('/chat', upload, async (req, res) => {
     const maxRetries = 10;
     let retryCount = 0;
 
+    const base64Image = image ? Buffer.from(image.buffer).toString('base64') : null;
+
     const getLlamaText = async () => {
-      const text = await llamaRequest({text: inputText, history, grammar})
+      const text = await llamaRequest({text: inputText, history, grammar, image: base64Image ?? undefined})
 
       if (grammar && grammar !== '') {
         const parsedJson = () => {
@@ -188,7 +194,7 @@ function sttRequest(fileBuffer) {
     });
 }
 
-async function llamaRequest({text, history, grammar}) {
+async function llamaRequest({text, image, history, grammar}) {
   const prompt = history + '\nUser: ' + text + '\nDoogle:';
 
   const data = {
@@ -210,7 +216,7 @@ async function llamaRequest({text, history, grammar}) {
     'mirostat_eta': 0.1,
     'grammar': grammar,
     'n_probs': 0,
-    'image_data': [],
+    'image_data': image ? [{data: image, id: 10}] : [],
     'cache_prompt': true,
     'api_key': '',
     'slot_id': -1,

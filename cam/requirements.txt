@@ -1,0 +1,7 @@
+requests
+numpy
+RPi.GPIO
+python-vlc
+imageio
+imageio-ffmpeg
+pillow

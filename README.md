@@ -9,6 +9,7 @@ Smart speaker designed to replace the big tech alternatives. The heavy lifting i
 - [Installation](#installation)
   - [Server](#server)
   - [Chatbot](#chatbot)
+  - [Cam](#cam)
 - [Functions](#functions)
   - [Command-type function](#command-type-function)
   - [Environment-type function](#environment-type-function)
@@ -90,6 +91,7 @@ autologin-user-timeout=0
 Configure Doogle to start at login.
 
 `echo "/home/doogle/doogle/chatbot/run_chatbot.sh" >> ~/.bashrc`
+`chmod +x /home/dooglecam/run_stream.sh`
 
 Install some optional packages to do with functions.
 
@@ -100,6 +102,24 @@ For the radio:
 Reboot the Raspberry Pi.
 
 `sudo reboot`
+
+### Cam
+
+Install dependencies
+
+`sudo apt-get update` and `sudo apt-get install vlc`
+
+In the [Seat:*] section of the file, add or modify the following lines:
+
+```
+[Seat:*]
+autologin-user=dooglecam
+autologin-user-timeout=0
+```
+
+Configure Doogle Cam to start at login.
+
+`echo "/home/dooglecam/run_stream.sh" >> ~/.bashrc`
 
 #### Functions
 
