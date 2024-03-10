@@ -119,7 +119,8 @@ autologin-user-timeout=0
 
 Configure Doogle Cam to start at login.
 
-`echo "/home/dooglecam/run_stream.sh" >> ~/.bashrc`
+`echo "/home/dooglecam/run_stream.sh &" >> ~/.bashrc`
+`echo "/home/dooglecam/run_cam.sh &" >> ~/.bashrc`
 
 #### Functions
 
