@@ -98,12 +98,12 @@
   },
 "turnTheLightsOn": {
   "type": "wakeword",
-  "model": "doogle_lights_on",
+  "model": "hey_doogle_lights_on",
   "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
 },
   "turnTheLightsOff": {
     "type": "wakeword",
-    "model": "doogle_lights_off",
+    "model": "hey_doogle_lights_off",
     "command": ".venv/bin/python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
   }
 }

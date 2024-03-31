@@ -17,9 +17,18 @@ services:
     build:
       context: './llamaCpp'
       dockerfile: 'Dockerfile'
+      args:
+        MODEL_DOWNLOAD_URL: https://huggingface.co/jartine/llava-v1.5-7B-GGUF/resolve/main/llava-v1.5-7b-Q8_0.gguf
+        MMPROJ_DOWNLOAD_URL: https://huggingface.co/jartine/llava-v1.5-7B-GGUF/resolve/main/llava-v1.5-7b-mmproj-f16.gguf
+
+        # MODEL_DOWNLOAD_URL: https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q8_0.gguf
+        # MODEL_DOWNLOAD_URL: https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf
+
+        # MODEL_DOWNLOAD_URL: https://huggingface.co/cmp-nct/llava-1.6-gguf/resolve/main/ggml-mistral-q_4_k.gguf
+        # MMPROJ_DOWNLOAD_URL: https://huggingface.co/cmp-nct/llava-1.6-gguf/resolve/main/mmproj-mistral7b-f16.gguf
     ports:
       - '7000:7000'
-    command: '--server -m /models/ggml-mistral-q_4_k.gguf --mmproj /models/mmproj-mistral7b-f16.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
+    command: '--server -m /models/llava-v1.5-7b-Q8_0.gguf --mmproj /models/llava-v1.5-7b-mmproj-f16.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
     restart: 'always'
     networks:
       - network

@@ -8,10 +8,11 @@ ARG BASE_CUDA_DEV_CONTAINER=nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VER
 
 FROM ${BASE_CUDA_DEV_CONTAINER} as build
 
-EXPOSE 7000
-
 # Unless otherwise specified, we make a fat build.
 ARG CUDA_DOCKER_ARCH=all
+
+ARG MODEL_DOWNLOAD_URL
+ARG MMPROJ_DOWNLOAD_URL
 
 WORKDIR /app
 
@@ -19,6 +20,8 @@ RUN apt-get update && \
     apt-get install -y build-essential python3 python3-pip git wget
 
 RUN git clone https://github.com/ggerganov/llama.cpp.git /app
+
+RUN cd /app && git checkout ceca1aef0738b57951cd12c603c3477e75312dec && cd ../
 
 RUN pip install --upgrade pip setuptools wheel \
     && pip install -r requirements.txt
@@ -37,9 +40,9 @@ RUN make
 # Download the models
 RUN mkdir /models
 
-RUN wget -O /models/ggml-mistral-q_4_k.gguf "https://huggingface.co/cmp-nct/llava-1.6-gguf/resolve/main/ggml-mistral-q_4_k.gguf?download=true"
+RUN wget -P /models ${MODEL_DOWNLOAD_URL}
 
-RUN wget -O /models/mmproj-mistral7b-f16.gguf "https://huggingface.co/cmp-nct/llava-1.6-gguf/resolve/main/mmproj-mistral7b-f16.gguf?download=true"
+RUN if [ -n "${MMPROJ_DOWNLOAD_URL}" ]; then wget -P /models ${MMPROJ_DOWNLOAD_URL}; fi
 
 ENTRYPOINT ["/app/.devops/tools.sh"]
 

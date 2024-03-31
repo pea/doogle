@@ -9,6 +9,10 @@ from PIL import Image
 import io
 import datetime
 import logging
+import os
+
+if os.path.isfile('cam.log'):
+  os.remove('cam.log')
 
 logging.basicConfig(filename='cam.log', level=logging.INFO, 
                     format='%(asctime)s %(levelname)s: %(message)s', 
@@ -39,7 +43,7 @@ class Cam:
       
     data = {
         'history': 'This is Doogle Cam who describes images sent to it via a video stream.',
-        'text': '[img-10]whats in this image?',
+        'text': '[img-10]what do you see?',
         'grammar': ''
       }
     
@@ -48,7 +52,7 @@ class Cam:
         headers=None,
         files=files,
         data=data,
-        timeout=60
+        timeout=15
       )
 
     if response.status_code == 200:
@@ -59,10 +63,24 @@ class Cam:
     else:
       print('Error: ', response.status_code)
 
+  def message_speaker(self, message):
+    if message is None:
+      return
+    
+    data = {
+      'message': message
+    }
+
+    requests.post(
+      'http://doogle.local/message',
+      headers=None,
+      data=data,
+      timeout=15
+    )
+
   def start(self):
     while True:
       if self.motion_sensor.motion_detected:
-        print("Motion detected")
         image = self.capture_still()
         llm_message = self.llm_request(image)
 

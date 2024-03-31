@@ -121,7 +121,7 @@ class ChatBot:
           self.is_recording = False
           self.time_started_recording = 0
 
-    if heyDoogleScore >= 0.05 and not detected_function_wakeword:
+    if heyDoogleScore >= 0.1 and not detected_function_wakeword:
       self.should_record = True
       self.time_last_voice_detected = time.time()
 
