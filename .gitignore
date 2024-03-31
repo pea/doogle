@@ -4,3 +4,4 @@ recording.tmp.wav
 __pycache__/
 node_modules/
 chat.log
+.venv

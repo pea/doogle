@@ -1,7 +1,7 @@
 pyaudio
 requests
 numpy
-openwakeword=0.5.1
+openwakeword==0.5.1
 rpi_rf
 python-vlc
 pyradios

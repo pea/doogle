@@ -96,14 +96,19 @@
     "command": "python3 functions/timer.py --time [option]",
     "optionExample": "10"
   },
-"turnTheLightsOn": {
-  "type": "wakeword",
-  "model": "hey_doogle_lights_on",
-  "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
-},
+  "turnTheLightsOn": {
+    "type": "wakeword",
+    "model": "hey_doogle_lights_on",
+    "command": ".venv/bin/python3 functions/transmit.py 4543573 -p 433 && python3 functions/transmit.py 4527445 -p 433"
+  },
   "turnTheLightsOff": {
     "type": "wakeword",
     "model": "hey_doogle_lights_off",
     "command": ".venv/bin/python3 functions/transmit.py 4543572 -p 433 && python3 functions/transmit.py 4527444 -p 433"
+  },
+  "weather": {
+    "type": "environment",
+    "prompt": "Today's weather forecast in London is [function_response]",
+    "command": "python3 functions/weather.py --latitude 51.5085 --longitude -0.1257"
   }
 }
