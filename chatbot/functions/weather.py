@@ -30,7 +30,7 @@ def weather(latitude, longitude):
   if max(data['hourly']['wind_speed_180m']) > 30:
     wind_speed_rating = "very strong"
 
-  return_string = "It will feel coldest at " + coldest_hour_12h + " with a temperature of approximately " + str(coldest_temp) + " celcius. It will feel hottest at " + hottest_hour_12h + " with a temperature of approximately " + str(hottest_temp) + " celcius. It will be windiest at " + datetime.datetime.fromtimestamp(data['hourly']['wind_speed_180m'].index(max(data['hourly']['wind_speed_180m'])) * 3600).strftime("%l %p") + " with a wind speed of " + str(max(data['hourly']['wind_speed_180m'])) + " mph, which is " + wind_speed_rating + "."
+  return_string = "It will feel coldest at " + coldest_hour_12h + " with a temperature of approximately " + str(round(coldest_temp)) + " celcius. It will feel hottest at " + hottest_hour_12h + " with a temperature of approximately " + str(round(hottest_temp)) + " celcius. It will be windiest at " + datetime.datetime.fromtimestamp(data['hourly']['wind_speed_180m'].index(max(data['hourly']['wind_speed_180m'])) * 3600).strftime("%l %p") + " with a wind speed of " + str(round(max(data['hourly']['wind_speed_180m']))) + " miles per hour, which is " + wind_speed_rating + "."
 
   if len(hours_with_rain) > 0:
     return_string += " It will rain at " + ", ".join([datetime.datetime.fromtimestamp(i * 3600).strftime("%l %p") for i in hours_with_rain]) + "."
