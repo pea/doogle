@@ -59,6 +59,12 @@
     "triggerWords": ["radio", "play", "jazz"],
     "command": "python3 functions/vlc.py --url https://edge-bauerall-01-gos2.sharp-stream.com/jazzhigh.aac"
   },
+  "playRteRadioOne": {
+    "type": "command",
+    "prompt": "CAN play RTE radio one",
+    "triggerWords": ["radio", "play"],
+    "command": "python3 functions/vlc.py --url https://liveaudio.rte.ie/hls-radio/radio1/chunklist.m3u8"
+  },
   "playNews": {
     "type": "command",
     "prompt": "CAN play the news",
