@@ -8,3 +8,4 @@ pyradios
 pyusb==1.0.2
 click==7.0
 RPi.GPIO
+python-dotenv

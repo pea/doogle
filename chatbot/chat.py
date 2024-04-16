@@ -20,19 +20,15 @@ from functions import get_functions_by_type
 from functions import trigger_words_detected
 from prompt import prompt
 import io
-import argparse
 import logging
 import re
+from dotenv import load_dotenv
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--apihost', type=str, default='192.168.0.131')
-parser.add_argument('--debug', type=bool, default=False)
-parser.add_argument('--wakeword', type=str, default='hey_doogle')
-args = parser.parse_args()
+load_dotenv()
 
-debug = args.debug
-apihost = args.apihost
-wakeword = args.wakeword
+debug = os.getenv('DOOGLE_DEBUG')
+apihost = os.getenv('API_HOST')
+wakeword = os.getenv('WAKEWORD')
 
 if os.path.isfile('chat.log'):
   os.remove('chat.log')
@@ -83,10 +79,18 @@ class ChatBot:
     try:
       self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
       self.Mic_tuning = Tuning(self.mic_instance)
-      self.Mic_tuning.write('GAMMAVAD_SR', 100.0)
+      self.Mic_tuning.write('GAMMAVAD_SR', 30.0)
+      self.Mic_tuning.write('AGCMAXGAIN', 51.600000381469727)
+      self.Mic_tuning.write('AGCGAIN', 4.125182945281267)
+      self.Mic_tuning.write('AGCTIME', 0.1)
 
-      if debug:
-        logging.info(f'GAMMAVAD_SR: {self.Mic_tuning.read("GAMMAVAD_SR")}')
+      self.log(f"""
+      GAMMAVAD_SR: {self.Mic_tuning.read("GAMMAVAD_SR")}
+      AGCONOFF: {self.Mic_tuning.read("AGCONOFF")}
+      AGCMAXGAIN: {self.Mic_tuning.read("AGCMAXGAIN")}
+      AGCGAIN: {self.Mic_tuning.read("AGCGAIN")}
+      AGCTIME: {self.Mic_tuning.read("AGCTIME")}
+      """)
 
     except Exception as e:
       self.Mic_tuning = None
@@ -128,9 +132,10 @@ class ChatBot:
           self.is_recording = False
           self.time_started_recording = 0
 
-    if heyDoogleScore >= 0.1 and not detected_function_wakeword:
+    if heyDoogleScore >= 0.5 and not detected_function_wakeword:
       self.should_record = True
       self.time_last_voice_detected = time.time()
+      self.log(f'{wakeword} wake word score: {heyDoogleScore}')
 
     if self.should_record and not self.is_recording:
       self.play_audio("sound/open.wav", 70)
@@ -229,6 +234,7 @@ class ChatBot:
 
   def trim_stt(self, text):
     text = re.sub(r'\[.*?\]', '', text)
+    text = re.sub(r'\(.+?\)', '', text)
     text = text.replace("\n", "")
     text = text.strip()
     return text
@@ -250,18 +256,16 @@ class ChatBot:
       if userStt is None or self.trim_stt(userStt) == "":
         self.stop_leds()
         self.setup_leds()
-        self.play_audio("sound/error.wav", 70)
+        self.play_audio("sound/error.wav", 50)
         return
 
       new_prompt = prompt(userText=userStt)
-
-      if debug:
-        logging.info(f'User STT: {userStt}')
+      
+      self.log(f'User STT: {userStt}')
 
       numTriggerWordsDetected = len(trigger_words_detected(userStt))
-
-      if debug:
-          logging.info(f'Trigger words detected: {str(numTriggerWordsDetected)} from text {userStt}')
+      
+      self.log(f'Trigger words detected: {str(numTriggerWordsDetected)} from text {userStt}')
 
       if numTriggerWordsDetected > 0:
         grammar = grammar_types()
@@ -273,8 +277,7 @@ class ChatBot:
         'grammar': grammar
       }
 
-      if debug:
-        logging.info(data)
+      self.log(data)
 
       response = requests.post(
         f'http://{apihost}:4000/chat',
@@ -294,8 +297,7 @@ class ChatBot:
         'grammar': ''
       }
 
-      if debug:
-        logging.info(data)
+      self.log(data)
 
       response = requests.post(
         f'http://{apihost}:4000/chat',
@@ -312,18 +314,25 @@ class ChatBot:
     if response.status_code != 200:
       self.tts("There was an error with a request. " + response.text)
       self.setup_leds()
-      if debug:
-        logging.info('Headers: %s', response.headers)
-        logging.info('Status code: %s', response.status_code)
-        logging.info('Body: %s', response.text)
-        logging.info('Request: %s', response.request.body)
+      self.log(f"""
+      Headers: {response.headers}
+      Status code: {response.status_code}
+      Body: {response.text}
+      Request: {response.request.body}
+      """)
 
     response_json = json.loads(response.text)
+
+    if (self.trim_stt(response_json['sttText']) == ""):
+      self.stop_leds()
+      self.setup_leds()
+      self.play_audio("sound/error.wav", 50)
+      return
 
     if debug:
       debug_response = response_json.copy()
       debug_response['wavData'] = "WAV DATA"
-      logging.info(debug_response)
+      self.log(debug_response)
 
     llamaText = response_json['llamaText']
 
@@ -344,18 +353,18 @@ class ChatBot:
     except:
       self.tts("There was an error with a request. " + response.text)
       self.setup_leds()
-      if debug:
-        logging.info('Headers: %s', response.headers)
-        logging.info('Status code: %s', response.status_code)
-        logging.info('Body: %s', response.text)
-        logging.info('Request: %s', response.request.body)
+      self.log(f"""
+      Headers: {response.headers}
+      Status code: {response.status_code}
+      Body: {response.text}
+      Request: {response.request.body}
+      """)
       return None
     
     return (message, sttText, wavDataBytes, function, option)
   
   def handle_function(self, function, option):
-    if debug:
-      logging.info(f'Running function {function} with option {option}')
+    self.log(f'Running function {function} with option {option}')
 
     run_function(function, option)
 
@@ -374,12 +383,7 @@ class ChatBot:
 
     message, sttText, wavDataBytes, function = llm_response
 
-    def strip_non_words(s):
-      s = re.sub(r'\[.*?\]', '', s)
-      s = re.sub(r'\s', '', s)
-      return s
-
-    if (strip_non_words(sttText) is not ""):
+    if (self.trim_stt(sttText) is not ""):
       self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
       self.pause_media()
       self.play_audio(wavDataBytes)
@@ -400,8 +404,7 @@ class ChatBot:
 
     if function != "None" and function != "none":
       functionObj = get_function(function)
-      if debug:
-        logging.info(f'Function object: {functionObj}')
+      self.log(f'Function object: {functionObj}')
       if functionObj['type'] == 'command':
         self.handle_function(function, option)
         return
@@ -477,11 +480,12 @@ class ChatBot:
       self.setup_leds()
       if response.text is not None:
         self.tts(response.text)
-      if debug:
-        logging.info('Headers: %s', response.headers)
-        logging.info('Status code: %s', response.status_code)
-        logging.info('Body: %s', response.text)
-        logging.info('Request: %s', response.request.body)
+      self.log(f"""
+      Headers: {response.headers}
+      Status code: {response.status_code}
+      Body: {response.text}
+      Request: {response.request.body}
+      """)
       return
     
 
@@ -525,6 +529,10 @@ class ChatBot:
       return 0xffffff
     else:
       return 0x000000
+    
+  def log(self, message):
+    if debug:
+      logging.info(f'{message}\n')
 
 chatbot = ChatBot()
 chatbot.start()

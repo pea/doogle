@@ -17,7 +17,7 @@ then
     echo "Doogle started in debug mode"
   fi
 else 
-  until ./chat.py --debug $DOOGLE_DEBUG; do
+  until ./chat.py; do
     echo "Script crashed with exit code $?. Respawning.." >&2
     sleep 2
   done

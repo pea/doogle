@@ -27,10 +27,10 @@ ENV CUDA_MAIN_VERSION=12.3
 ENV LD_LIBRARY_PATH /usr/local/cuda-${CUDA_MAIN_VERSION}/compat:$LD_LIBRARY_PATH
 
 # Install Whisper codebase
-RUN git clone --branch v1.5.3 https://github.com/ggerganov/whisper.cpp.git .
+RUN git clone --branch v1.5.4 https://github.com/ggerganov/whisper.cpp.git .
 
 # Download the model
-RUN bash ./models/download-ggml-model.sh small.en
+RUN bash ./models/download-ggml-model.sh base.en
 
 # Build Whisper
 RUN make
@@ -44,5 +44,5 @@ RUN apt-get update && \
 
 COPY --from=build /app /app
 
-CMD ["/app/server", "--host", "0.0.0.0", "--port", "6060", "--model", "models/ggml-small.en.bin"]
+CMD ["/app/server", "--host", "0.0.0.0", "--port", "6060", "--model", "models/ggml-base.en.bin"]
 

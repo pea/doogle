@@ -3,6 +3,11 @@ from functions import run_function
 import json
 import os
 import subprocess
+from dotenv import load_dotenv
+
+load_dotenv()
+
+base_prompt = os.getenv("BASE_PROMPT") if os.getenv("BASE_PROMPT") is not None else "This is a chat between a user and Doogle."
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -32,7 +37,7 @@ def prompt(userText = None):
   with open(functions_json_file) as f:
       functions_json = json.load(f)
 
-  prompt = "This is a chat between a user and Doogle.\n"
+  prompt = base_prompt + "\n"
 
   if trigger_words_detected(userText):
     prompt = prompt + "Doogle can use tools by using the function parameter. Doogle ALWAYS sets a function in the function parameter when using a tool.\n"
