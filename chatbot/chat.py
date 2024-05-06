@@ -3,7 +3,6 @@
 import pyaudio
 import time
 import numpy as np
-from openwakeword.model import Model
 import usb.core
 import usb.util
 import wave
@@ -23,12 +22,15 @@ import io
 import logging
 import re
 from dotenv import load_dotenv
+from wakeword.openwakeword.openwakeword import OpenWakeWord
+from wakeword.porcupine.porcupine import Porcupine
 
 load_dotenv()
 
 debug = os.getenv('DOOGLE_DEBUG')
 apihost = os.getenv('API_HOST')
-wakeword = os.getenv('WAKEWORD')
+wakeword_library = os.getenv('WAKEWORD_LIBRARY')
+porcupine_access_key = os.getenv('PORCUPINE_ACCESS_KEY')
 
 if os.path.isfile('chat.log'):
   os.remove('chat.log')
@@ -48,7 +50,7 @@ except ImportError:
 
 class ChatBot:
   def __init__(self):
-    self.CHUNK = 1024
+    self.CHUNK = 512
     self.RATE = 16000
     self.p = pyaudio.PyAudio()
     self.stream = None
@@ -65,24 +67,20 @@ class ChatBot:
     self.pulse_leds_thread = None
     self.wakeword_functions = get_functions_by_type('wakeword')
 
-    wakeword_function_models = []
-    for wakeword_function in self.wakeword_functions:
-      wakeword_function_models.append(f'./models/{self.wakeword_functions[wakeword_function]["model"]}.tflite')
-
-    wakeword_function_models.append('./models/'+wakeword+'.tflite')
-
-    self.owwModel = Model(
-      wakeword_models=wakeword_function_models,
-      inference_framework="tflite"
-    )
+    if wakeword_library == 'porcupine':
+      self.wakeword = Porcupine(porcupine_access_key)
+    else:
+      self.wakeword = OpenWakeWord()
 
     try:
       self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
       self.Mic_tuning = Tuning(self.mic_instance)
       self.Mic_tuning.write('GAMMAVAD_SR', 30.0)
-      self.Mic_tuning.write('AGCMAXGAIN', 51.600000381469727)
-      self.Mic_tuning.write('AGCGAIN', 4.125182945281267)
-      self.Mic_tuning.write('AGCTIME', 0.1)
+      self.Mic_tuning.write('AGCONOFF', 0)
+      # self.Mic_tuning.write('AGCMAXGAIN', 51.600000381469727)
+      # self.Mic_tuning.write('AGCGAIN', 4.125182945281267)
+      # self.Mic_tuning.write('AGCTIME', 0.1)
+      # self.Mic_tuning.write('AGCDESIREDLEVEL', 0.1)
 
       self.log(f"""
       GAMMAVAD_SR: {self.Mic_tuning.read("GAMMAVAD_SR")}
@@ -90,6 +88,8 @@ class ChatBot:
       AGCMAXGAIN: {self.Mic_tuning.read("AGCMAXGAIN")}
       AGCGAIN: {self.Mic_tuning.read("AGCGAIN")}
       AGCTIME: {self.Mic_tuning.read("AGCTIME")}
+      AGCDESIREDLEVEL: {self.Mic_tuning.read("AGCDESIREDLEVEL")}
+      AGCMAXGAIN: {self.Mic_tuning.read("AGCMAXGAIN")}
       """)
 
     except Exception as e:
@@ -99,26 +99,20 @@ class ChatBot:
 
   def stream_callback(self, in_data, frame_count, time_info, status):
     data = np.frombuffer(in_data, dtype=np.int16)
-    prediction = self.owwModel.predict(np.frombuffer(data, dtype=np.int16))
-    heyDoogleScore = prediction[wakeword]
+    detected_wakewords = self.wakeword.detected(data)
 
-    detected_function_wakeword = False
+    detected_function_wakewords = filter(lambda wakeword: wakeword != "hey_doogle", detected_wakewords) if len(detected_wakewords) > 1 else []
+    is_detected_function_wakeword = len(detected_function_wakewords) > 0
+    is_detected_heydoogle_wakeword = "hey_doogle" in detected_wakewords and len(detected_wakewords) == 1
 
-    function_wakeword_scores = {}
-
-    for wakeword_function in self.wakeword_functions:
-      if prediction[self.wakeword_functions[wakeword_function]['model']] > 0.6:
-        function_wakeword_scores[wakeword_function] = prediction[self.wakeword_functions[wakeword_function]['model']]
-        detected_function_wakeword = True
-
-    if detected_function_wakeword:
-      function_wakeword = max(function_wakeword_scores, key=function_wakeword_scores.get)
+    if is_detected_function_wakeword:
+      function_wakeword = detected_function_wakewords[0]
       run_function(function_wakeword)
 
     if self.Mic_tuning is not None:
       voice_detected = self.Mic_tuning.is_voice()
     else:
-      voice_detected = heyDoogleScore >= 0.5
+      voice_detected = is_detected_heydoogle_wakeword
 
     if voice_detected:
       self.time_last_voice_detected = time.time()
@@ -132,10 +126,9 @@ class ChatBot:
           self.is_recording = False
           self.time_started_recording = 0
 
-    if heyDoogleScore >= 0.5 and not detected_function_wakeword:
+    if is_detected_heydoogle_wakeword:
       self.should_record = True
       self.time_last_voice_detected = time.time()
-      self.log(f'{wakeword} wake word score: {heyDoogleScore}')
 
     if self.should_record and not self.is_recording:
       self.play_audio("sound/open.wav", 70)
