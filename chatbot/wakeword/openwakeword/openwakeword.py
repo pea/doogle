@@ -29,8 +29,13 @@ class OpenWakeWord:
         if prediction[1] > 0.5:
           detected.append(prediction[0])
 
+      # Alternative spelling of Doogle
+      if len(detected) > 0 and detected[0] == "hey_dougal":
+        return ["hey_doogle"]
+
       return detected
     
     def get_model_files(self, directory):
-     return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and f.endswith('.tflite')]
+     filenames = ["hey_dougal"]
+     return [os.path.join(directory, f"{filename}.tflite") for filename in filenames]
      
