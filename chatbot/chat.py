@@ -50,7 +50,7 @@ except ImportError:
 
 class ChatBot:
   def __init__(self):
-    self.CHUNK = 512
+    self.CHUNK = 5120
     self.RATE = 16000
     self.p = pyaudio.PyAudio()
     self.stream = None
@@ -75,8 +75,8 @@ class ChatBot:
     try:
       self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
       self.Mic_tuning = Tuning(self.mic_instance)
-      self.Mic_tuning.write('GAMMAVAD_SR', 30.0)
-      self.Mic_tuning.write('AGCONOFF', 0)
+      # self.Mic_tuning.write('GAMMAVAD_SR', 30.0)
+      # self.Mic_tuning.write('AGCONOFF', 0)
       # self.Mic_tuning.write('AGCMAXGAIN', 51.600000381469727)
       # self.Mic_tuning.write('AGCGAIN', 4.125182945281267)
       # self.Mic_tuning.write('AGCTIME', 0.1)
@@ -117,7 +117,7 @@ class ChatBot:
     if voice_detected:
       self.time_last_voice_detected = time.time()
     else:
-      if time.time() - self.time_last_voice_detected > 1:
+      if time.time() - self.time_last_voice_detected > 2:
         if self.recording is not None and self.is_recording:
           self.play_audio("sound/close.wav", 70)
           threading.Thread(target=self.handle_recording).start()
@@ -531,6 +531,6 @@ chatbot = ChatBot()
 chatbot.start()
 
 while chatbot.stream.is_active():
-  time.sleep(0.1)
+  time.sleep(0)
 
 chatbot.stop()

@@ -1,0 +1,1 @@
+cd /home/doogle/doogle/chatbot && source .venv/bin/activate && pkill chat.py && python chat.py
