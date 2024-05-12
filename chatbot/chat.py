@@ -31,6 +31,7 @@ debug = os.getenv('DOOGLE_DEBUG')
 apihost = os.getenv('API_HOST')
 wakeword_library = os.getenv('WAKEWORD_LIBRARY')
 porcupine_access_key = os.getenv('PORCUPINE_ACCESS_KEY')
+conversation_mode = os.getenv('CONVERSATION_MODE')
 
 if os.path.isfile('chat.log'):
   os.remove('chat.log')
@@ -66,6 +67,9 @@ class ChatBot:
     self.should_stop_pulsing = False
     self.pulse_leds_thread = None
     self.wakeword_functions = get_functions_by_type('wakeword')
+    self.should_enable_voice_detection = True
+    self.led_mode = None
+    self.seconds_wait_speak = 2
 
     if wakeword_library == 'porcupine':
       self.wakeword = Porcupine(porcupine_access_key)
@@ -97,6 +101,12 @@ class ChatBot:
 
     self.setup_leds()
 
+  def voice_detected(self):
+    if (self.should_enable_voice_detection == True):
+      return self.Mic_tuning.is_voice()
+    else:
+      return False
+
   def stream_callback(self, in_data, frame_count, time_info, status):
     data = np.frombuffer(in_data, dtype=np.int16)
     detected_wakewords = self.wakeword.detected(data)
@@ -110,16 +120,22 @@ class ChatBot:
       run_function(function_wakeword)
 
     if self.Mic_tuning is not None:
-      voice_detected = self.Mic_tuning.is_voice()
+      voice_detected = self.voice_detected()
     else:
-      voice_detected = is_detected_heydoogle_wakeword
+      if self.should_enable_voice_detection:
+        voice_detected = is_detected_heydoogle_wakeword
+      else:
+        voice_detected = False
 
     if voice_detected:
       self.time_last_voice_detected = time.time()
+      self.log(f'Voice detected')
     else:
-      if time.time() - self.time_last_voice_detected > 1.5:
+      if time.time() - self.time_last_voice_detected > self.seconds_wait_speak:
         if self.recording is not None and self.is_recording:
+          self.log(f'Voice not detected for {self.seconds_wait_speak} seconds while recording, stopping recording')
           self.play_audio("sound/close.wav", 70)
+          self.reset_leds()
           threading.Thread(target=self.handle_recording).start()
           threading.Thread(target=self.resume_media).start()
           self.should_record = False
@@ -129,16 +145,16 @@ class ChatBot:
     if is_detected_heydoogle_wakeword:
       self.should_record = True
       self.time_last_voice_detected = time.time()
+      self.seconds_wait_speak = 2
+      self.log(f'Hey Doogle wakeword detected')
 
     if self.should_record and not self.is_recording:
       self.play_audio("sound/open.wav", 70)
-      try:
-        pixel_ring.listen()
-      except:
-        pass
 
     if self.should_record:
       self.is_recording = True
+      self.log(f'Recording in progress')
+      self.listen_leds()
       
       if self.time_started_recording == 0:
         self.time_started_recording = time.time()
@@ -148,31 +164,33 @@ class ChatBot:
           self.recording = data
       else:
         self.recording = np.concatenate((self.recording, data))
-        try:
-          pixel_ring.trace()
-        except:
-          pass
 
     if self.is_recording and time.time() - self.time_started_recording > 10:
+      self.log(f'User spoke for over 10 seconds, stopping recording')
       self.play_audio("sound/close.wav", 70)
       threading.Thread(target=self.handle_recording).start()
       threading.Thread(target=self.resume_media).start()
       self.should_record = False
       self.is_recording = False
       self.time_started_recording = 0
+      self.reset_leds()
 
-    if self.time_last_response != 0 and time.time() - self.time_last_response > 20 and self.recording is None:
+    if self.time_last_response != 0 and time.time() - self.time_last_response > 20 and not self.is_recording:
+      self.log(f'No response for 20 seconds, resetting history')
       self.time_last_response = 0
       self.history = prompt()
       self.play_audio("sound/reset.wav", 70)
+      self.reset_leds()
 
     return (in_data, pyaudio.paContinue)
   
   def play_audio(self, input, volume=100):
+    self.should_enable_voice_detection = False
     if os.path.exists(input):
       subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
        subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    self.should_enable_voice_detection = True
 
   def find_microphone_index(self, partial_name):
     pi = pyaudio.PyAudio()
@@ -197,6 +215,39 @@ class ChatBot:
       pixel_ring.set_brightness(2)
       pixel_ring.set_color_palette(self.colour('cyan'), self.colour('black'))
       pixel_ring.trace()
+      self.led_mode = "trace"
+
+  def reset_leds(self):
+    try:
+      if self.led_mode is not "trace":
+        pixel_ring.trace()
+        self.led_mode = "trace"
+    except:
+      pass
+
+  def listen_leds(self):
+    try:
+      if self.led_mode is not "listen":
+        pixel_ring.spin()
+        self.led_mode = "listen"
+    except:
+      pass
+  
+  def loading_leds(self):
+    try:
+      if self.led_mode is not "speak":
+        pixel_ring.speak()
+        self.led_mode = "speak"
+    except:
+      pass
+
+  def stop_leds(self):
+    try:
+      if self.led_mode is not "off":
+        pixel_ring.off()
+        self.led_mode = "off"
+    except:
+      pass
 
   def frames_to_wav(self, frames, sample_width, channels, sample_rate):
     wav_io = io.BytesIO()
@@ -212,18 +263,6 @@ class ChatBot:
     wav_data = wav_io.getvalue()
 
     return wav_data
-  
-  def spin_leds(self):
-    try:
-      pixel_ring.spin()
-    except:
-      pass
-
-  def stop_leds(self):
-    try:
-      pixel_ring.off()
-    except:
-      pass
 
   def trim_stt(self, text):
     text = re.sub(r'\[.*?\]', '', text)
@@ -234,9 +273,10 @@ class ChatBot:
   
   def llm_request(self, recording=None, text=None):
     if recording is not None and text is not None:
+      self.log("LLM request made but there is no audio or text")
+      self.reset_leds()
+      self.time_last_response = time.time()
       return
-    
-    self.spin_leds()
 
     if recording is not None:
       recording_wav = self.frames_to_wav(recording, pyaudio.get_sample_size(pyaudio.paInt16), 1, 16000)
@@ -248,11 +288,13 @@ class ChatBot:
 
       if userStt is None or self.trim_stt(userStt) == "":
         self.stop_leds()
-        self.setup_leds()
+        self.reset_leds()
         self.play_audio("sound/error.wav", 50)
         return
 
-      new_prompt = prompt(userText=userStt)
+      new_prompt = prompt(userText=userStt, history=self.history)
+
+      self.log(f'History: {self.history}')
       
       self.log(f'User STT: {userStt}')
 
@@ -272,6 +314,8 @@ class ChatBot:
 
       self.log(data)
 
+      self.loading_leds()
+
       response = requests.post(
         f'http://{apihost}:4000/chat',
         headers=None,
@@ -281,7 +325,6 @@ class ChatBot:
       )
 
       self.recording = None
-      self.time_last_response = time.time()
 
     if text is not None:
       data = {
@@ -291,6 +334,8 @@ class ChatBot:
       }
 
       self.log(data)
+
+      self.loading_leds()
 
       response = requests.post(
         f'http://{apihost}:4000/chat',
@@ -306,7 +351,7 @@ class ChatBot:
 
     if response.status_code != 200:
       self.tts("There was an error with a request. " + response.text)
-      self.setup_leds()
+      self.reset_leds()
       self.log(f"""
       Headers: {response.headers}
       Status code: {response.status_code}
@@ -318,7 +363,7 @@ class ChatBot:
 
     if (self.trim_stt(response_json['sttText']) == ""):
       self.stop_leds()
-      self.setup_leds()
+      self.reset_leds()
       self.play_audio("sound/error.wav", 50)
       return
 
@@ -345,7 +390,7 @@ class ChatBot:
       wavDataBytes = base64.b64decode(wavData)
     except:
       self.tts("There was an error with a request. " + response.text)
-      self.setup_leds()
+      self.reset_leds()
       self.log(f"""
       Headers: {response.headers}
       Status code: {response.status_code}
@@ -371,7 +416,7 @@ class ChatBot:
     )
 
     if llm_response is None:
-      self.setup_leds()
+      self.reset_leds()
       return
 
     message, sttText, wavDataBytes, function = llm_response
@@ -382,13 +427,26 @@ class ChatBot:
       self.play_audio(wavDataBytes)
       self.resume_media()
   
+  def start_listening(self):
+    if conversation_mode == "true":
+      self.should_record = True
+      self.seconds_wait_speak = 3
+      self.time_last_voice_detected = time.time()
+      self.listen_leds()
+
   def handle_recording(self):
     if self.recording is None:
+      self.log("Recording is empty")
+      self.time_last_response = time.time()
       return
-  
+
+    self.time_last_response = 0
+    
     llm_response = self.llm_request(recording=self.recording)
 
     if llm_response is None:
+      self.log("LLM response is missing")
+      self.time_last_response = time.time()
       return
     
     message, sttText, wavDataBytes, function, option = llm_response
@@ -409,6 +467,9 @@ class ChatBot:
     else:
       self.pause_media()
       self.play_audio(wavDataBytes)
+      self.time_last_response = time.time()
+      self.reset_leds()
+      self.start_listening()
       self.resume_media()
 
   def pause_media(self):
@@ -446,7 +507,7 @@ class ChatBot:
     )
     
     if response.status_code != 200:
-      self.setup_leds()
+      self.reset_leds()
       return
     
     response_json = response.json()
@@ -470,7 +531,7 @@ class ChatBot:
     )
 
     if response.status_code != 200:
-      self.setup_leds()
+      self.reset_leds()
       if response.text is not None:
         self.tts(response.text)
       self.log(f"""
@@ -525,7 +586,7 @@ class ChatBot:
     
   def log(self, message):
     if debug:
-      logging.info(f'{message}\n')
+      logging.info(f'{message}')
 
 chatbot = ChatBot()
 chatbot.start()

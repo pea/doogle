@@ -33,7 +33,7 @@ def trigger_words_detected(userText):
 
   return detected
 
-def prompt(userText = None):
+def prompt(userText = None, history = None):
   with open(functions_json_file) as f:
       functions_json = json.load(f)
 
@@ -41,6 +41,9 @@ def prompt(userText = None):
 
   if trigger_words_detected(userText):
     prompt = prompt + "Doogle can use tools by using the function parameter. Doogle ALWAYS sets a function in the function parameter when using a tool.\n"
+
+  if history is not None:
+    prompt = prompt + history + "\n"
 
   # Handle environment functions
   environment_functions = []
@@ -80,16 +83,5 @@ def prompt(userText = None):
     prompt = prompt + can_do_functions
     if len(can_do_functions) > 0:
       prompt = prompt + "\n"
-
-    # # Handle function examples
-    # function_examples = []
-    # for function in matching_functions:
-    #   if function['type'] == 'command':
-    #     optionExample = function['optionExample'] if 'optionExample' in function else "None"
-    #     function_examples.append("User: " + function['prompt'] + ". \nDoogle: {'message': '', 'function': '" + function["name"] + "', 'options': '" + optionExample + "'}\n")
-    # function_examples = ''.join(function_examples)
-    # function_examples = function_examples + "\n" if len(function_examples) > 0 else ""
-    # if len(function_examples) > 0:
-    #   prompt = prompt + function_examples
 
   return prompt
