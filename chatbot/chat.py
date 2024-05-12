@@ -117,7 +117,7 @@ class ChatBot:
     if voice_detected:
       self.time_last_voice_detected = time.time()
     else:
-      if time.time() - self.time_last_voice_detected > 2:
+      if time.time() - self.time_last_voice_detected > 1.5:
         if self.recording is not None and self.is_recording:
           self.play_audio("sound/close.wav", 70)
           threading.Thread(target=self.handle_recording).start()

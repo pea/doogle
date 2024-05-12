@@ -26,7 +26,7 @@ class OpenWakeWord:
       detected = []
 
       for prediction in predictions_sorted_by_score:
-        if prediction[1] > 0.5:
+        if prediction[1] > 0.6:
           detected.append(prediction[0])
 
       # Alternative spelling of Doogle
