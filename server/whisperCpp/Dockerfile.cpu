@@ -1,0 +1,25 @@
+FROM ubuntu:22.04 AS build
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+# Install Whisper codebase
+RUN git clone --branch v1.5.4 https://github.com/ggerganov/whisper.cpp.git .
+
+# Download the model
+RUN bash ./models/download-ggml-model.sh small.en
+
+# Build Whisper
+RUN make
+
+WORKDIR /app
+
+RUN apt-get update && \
+  apt-get install -y curl ffmpeg \
+  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+CMD ["/app/server", "--host", "0.0.0.0", "--port", "6060", "--model", "models/ggml-small.en.bin"]

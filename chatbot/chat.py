@@ -145,7 +145,7 @@ class ChatBot:
     if is_detected_heydoogle_wakeword:
       self.should_record = True
       self.time_last_voice_detected = time.time()
-      self.seconds_wait_speak = 2
+      self.seconds_wait_speak = 1.5
       self.log(f'Hey Doogle wakeword detected')
 
     if self.should_record and not self.is_recording:
@@ -217,11 +217,18 @@ class ChatBot:
       pixel_ring.trace()
       self.led_mode = "trace"
 
+  def colour_leds(self, colour):
+    try:
+      pixel_ring.set_color_palette(self.colour(colour), self.colour('black'))
+    except:
+      pass
+
   def reset_leds(self):
     try:
       if self.led_mode is not "trace":
         pixel_ring.trace()
         self.led_mode = "trace"
+        self.colour_leds("cyan")
     except:
       pass
 
@@ -273,18 +280,24 @@ class ChatBot:
   
   def llm_request(self, recording=None, text=None):
     if recording is not None and text is not None:
-      self.log("LLM request made but there is no audio or text")
+      self.log("No audio or text provided")
       self.reset_leds()
       self.time_last_response = time.time()
       return
 
     if recording is not None:
+      self.loading_leds()
+
       recording_wav = self.frames_to_wav(recording, pyaudio.get_sample_size(pyaudio.paInt16), 1, 16000)
       files = {
         'audio': recording_wav
       }
 
+      self.colour_leds("yellow")
+
       userStt = self.sst(recording_wav)
+
+      self.colour_leds("cyan")
 
       if userStt is None or self.trim_stt(userStt) == "":
         self.stop_leds()
@@ -308,21 +321,32 @@ class ChatBot:
         grammar = ""
 
       data = {
+        'text': userStt,
         'history': new_prompt,
         'grammar': grammar
       }
 
       self.log(data)
 
-      self.loading_leds()
+      self.colour_leds("green")
 
-      response = requests.post(
-        f'http://{apihost}:4000/chat',
-        headers=None,
-        files=files,
-        data=data,
-        timeout=15
-      )
+      try:
+        response = requests.post(
+          f'http://{apihost}:4000/chat',
+          headers=None,
+          json=data,
+          timeout=15
+        )
+      except:
+        self.log(f"""
+        Headers: {response.headers}
+        Status code: {response.status_code}
+        Body: {response.text}
+        Request: {response.request.body}
+        """)
+        self.play_audio("sound/error.wav", 50)
+
+      self.colour_leds("cyan")
 
       self.recording = None
 
@@ -337,17 +361,27 @@ class ChatBot:
 
       self.loading_leds()
 
-      response = requests.post(
-        f'http://{apihost}:4000/chat',
-        headers=None,
-        json=data,
-        timeout=15
-      )
+      self.colour_leds("purple")
 
-    try:
-      pixel_ring.trace()
-    except:
-      pass
+      try:
+        response = requests.post(
+          f'http://{apihost}:4000/chat',
+          headers=None,
+          json=data,
+          timeout=15
+        )
+      except:
+        self.log(f"""
+        Headers: {response.headers}
+        Status code: {response.status_code}
+        Body: {response.text}
+        Request: {response.request.body}
+        """)
+        self.play_audio("sound/error.wav", 50)
+
+      self.colour_leds("cyan")
+
+    self.reset_leds()
 
     if response.status_code != 200:
       self.tts("There was an error with a request. " + response.text)
@@ -438,6 +472,7 @@ class ChatBot:
     if self.recording is None:
       self.log("Recording is empty")
       self.time_last_response = time.time()
+      self.reset_leds()
       return
 
     self.time_last_response = 0
@@ -445,6 +480,7 @@ class ChatBot:
     llm_response = self.llm_request(recording=self.recording)
 
     if llm_response is None:
+      self.reset_leds()
       self.log("LLM response is missing")
       self.time_last_response = time.time()
       return
@@ -499,15 +535,16 @@ class ChatBot:
       'text': text
     }
     
-    response = requests.post(
-      f'http://{apihost}:4000/tts',
-      headers=None,
-      json=data,
-      timeout=15
-    )
-    
-    if response.status_code != 200:
+    try:
+      response = requests.post(
+        f'http://{apihost}:4000/tts',
+        headers=None,
+        json=data,
+        timeout=15
+      )
+    except:
       self.reset_leds()
+      self.play_audio("sound/error.wav", 50)
       return
     
     response_json = response.json()
@@ -523,15 +560,16 @@ class ChatBot:
       'file': wavDataBytes
     }
 
-    response = requests.post(
-      f'http://{apihost}:6060/inference',
-      headers=None,
-      files=files,
-      timeout=15
-    )
-
-    if response.status_code != 200:
+    try:
+      response = requests.post(
+        f'http://{apihost}:6060/inference',
+        headers=None,
+        files=files,
+        timeout=15
+      )
+    except:
       self.reset_leds()
+      self.play_audio("sound/error.wav", 50)
       if response.text is not None:
         self.tts(response.text)
       self.log(f"""
@@ -541,7 +579,6 @@ class ChatBot:
       Request: {response.request.body}
       """)
       return
-    
 
     responseJson = json.loads(response.text)
     text = responseJson['text']
