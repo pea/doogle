@@ -51,7 +51,7 @@ except ImportError:
 
 class ChatBot:
   def __init__(self):
-    self.CHUNK = 5120
+    self.CHUNK = 1024
     self.RATE = 16000
     self.p = pyaudio.PyAudio()
     self.stream = None
@@ -80,11 +80,11 @@ class ChatBot:
       self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
       self.Mic_tuning = Tuning(self.mic_instance)
       # self.Mic_tuning.write('GAMMAVAD_SR', 30.0)
-      # self.Mic_tuning.write('AGCONOFF', 0)
+      #self.Mic_tuning.write('AGCONOFF', 0)
       # self.Mic_tuning.write('AGCMAXGAIN', 51.600000381469727)
-      # self.Mic_tuning.write('AGCGAIN', 4.125182945281267)
+      #self.Mic_tuning.write('AGCGAIN', 4.125182945281267)
       # self.Mic_tuning.write('AGCTIME', 0.1)
-      # self.Mic_tuning.write('AGCDESIREDLEVEL', 0.1)
+      # self.Mic_tuning.write('AGCDESIREDLEVEL', 10)
 
       self.log(f"""
       GAMMAVAD_SR: {self.Mic_tuning.read("GAMMAVAD_SR")}
@@ -119,13 +119,19 @@ class ChatBot:
       function_wakeword = detected_function_wakewords[0]
       run_function(function_wakeword)
 
-    if self.Mic_tuning is not None:
-      voice_detected = self.voice_detected()
+    # Base voice detection on wakewords rather than VAD
+    if detected_wakewords is not None and (len(detected_wakewords) > 0 or is_detected_function_wakeword):
+      voice_detected = True
     else:
-      if self.should_enable_voice_detection:
-        voice_detected = is_detected_heydoogle_wakeword
-      else:
-        voice_detected = False
+      voice_detected = False
+
+    # if self.Mic_tuning is not None:
+    #   voice_detected = self.voice_detected()
+    # else:
+    #   if self.should_enable_voice_detection:
+    #     voice_detected = is_detected_heydoogle_wakeword
+    #   else:
+    #     voice_detected = False
 
     if voice_detected:
       self.time_last_voice_detected = time.time()

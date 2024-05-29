@@ -24,7 +24,7 @@ services:
         # MMPROJ_DOWNLOAD_URL: https://huggingface.co/cmp-nct/llava-1.6-gguf/resolve/main/mmproj-mistral7b-f16.gguf
     ports:
       - '7000:7000'
-    command: '--server -m /models/mistral-7b-instruct-v0.2.Q5_K_S.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0'
+    command: '--server -m /models/mistral-7b-instruct-v0.2.Q5_K_S.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0 --log-disable'
     restart: 'always'
     networks:
       - network
