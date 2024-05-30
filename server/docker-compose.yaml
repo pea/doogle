@@ -42,7 +42,7 @@ services:
   whisper:
     build:
       context: './whisperCpp'
-      dockerfile: 'Dockerfile.cpu'
+      dockerfile: 'Dockerfile'
     ports:
       - '6060:6060'
     restart: 'always'
@@ -50,14 +50,14 @@ services:
       - network
     logging:
       driver: none
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: 'nvidia'
-    #           count: 'all'
-    #           capabilities:
-    #             - 'gpu'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: 'nvidia'
+              count: 'all'
+              capabilities:
+                - 'gpu'
 
   tts:
     build:

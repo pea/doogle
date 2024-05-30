@@ -25,6 +25,8 @@ from dotenv import load_dotenv
 from wakeword.openwakeword.openwakeword import OpenWakeWord
 from wakeword.porcupine.porcupine import Porcupine
 
+
+
 load_dotenv()
 
 debug = os.getenv('DOOGLE_DEBUG')
@@ -51,7 +53,7 @@ except ImportError:
 
 class ChatBot:
   def __init__(self):
-    self.CHUNK = 1024
+    self.CHUNK = 1020
     self.RATE = 16000
     self.p = pyaudio.PyAudio()
     self.stream = None
@@ -70,11 +72,19 @@ class ChatBot:
     self.should_enable_voice_detection = True
     self.led_mode = None
     self.seconds_wait_speak = 2
+    self.current_volume = 0
+    self.prev_volume = 80
+
+    if GPIO is not None:
+      GPIO.setmode(GPIO.BCM)
+      GPIO.setup(27, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     if wakeword_library == 'porcupine':
       self.wakeword = Porcupine(porcupine_access_key)
     else:
       self.wakeword = OpenWakeWord()
+
+    self.set_volume(80)
 
     try:
       self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
@@ -101,6 +111,10 @@ class ChatBot:
 
     self.setup_leds()
 
+  def is_button_pressed(self):
+        if GPIO is not None:
+            return GPIO.input(27)
+
   def voice_detected(self):
     if (self.should_enable_voice_detection == True):
       return self.Mic_tuning.is_voice()
@@ -108,12 +122,27 @@ class ChatBot:
       return False
 
   def stream_callback(self, in_data, frame_count, time_info, status):
-    data = np.frombuffer(in_data, dtype=np.int16)
+    new_data = np.frombuffer(in_data, dtype=np.int16)
+    data_np = np.reshape(new_data, (-1, 6))  # Corrected line
+    data_channel_0 = np.ascontiguousarray(data_np[:, 0])
+    data_channel_1 = np.ascontiguousarray(data_np[:, 1])
+    data_channel_2 = np.ascontiguousarray(data_np[:, 2])
+    data_channel_3 = np.ascontiguousarray(data_np[:, 3])
+    data_channel_4 = np.ascontiguousarray(data_np[:, 4])
+    data_channel_5 = np.ascontiguousarray(data_np[:, 5])
+
+    data = data_channel_1
+
     detected_wakewords = self.wakeword.detected(data)
 
     detected_function_wakewords = filter(lambda wakeword: wakeword != "hey_doogle", detected_wakewords) if len(detected_wakewords) > 1 else []
     is_detected_function_wakeword = len(detected_function_wakewords) > 0
     is_detected_heydoogle_wakeword = "hey_doogle" in detected_wakewords and len(detected_wakewords) == 1
+
+    if self.is_button_pressed():
+      self.prev_volume = self.current_volume
+      detected_wakewords = ["hey_doogle"]
+      is_detected_heydoogle_wakeword = True
 
     if is_detected_function_wakeword:
       function_wakeword = detected_function_wakewords[0]
@@ -167,9 +196,9 @@ class ChatBot:
 
       threading.Thread(target=self.pause_media).start()
       if self.recording is None:
-          self.recording = data
+          self.recording = data_channel_0
       else:
-        self.recording = np.concatenate((self.recording, data))
+        self.recording = np.concatenate((self.recording, data_channel_0))
 
     if self.is_recording and time.time() - self.time_started_recording > 10:
       self.log(f'User spoke for over 10 seconds, stopping recording')
@@ -189,6 +218,11 @@ class ChatBot:
       self.reset_leds()
 
     return (in_data, pyaudio.paContinue)
+  
+  def set_volume(self, volume):
+    if volume != self.current_volume:
+      subprocess.call(["amixer", "set", "Master", "--", str(volume)+"%"])
+      self.current_volume = volume
   
   def play_audio(self, input, volume=100):
     self.should_enable_voice_detection = False
@@ -593,7 +627,7 @@ class ChatBot:
   def start(self):
     self.stream = self.p.open(
       format=pyaudio.paInt16,
-      channels=1,
+      channels=6,
       rate=self.RATE,
       input=True,
       input_device_index=self.find_microphone_index("ReSpeaker"),
