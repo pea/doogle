@@ -122,6 +122,10 @@ Configure Doogle Cam to start at login.
 `echo "/home/dooglecam/run_stream.sh &" >> ~/.bashrc`
 `echo "/home/dooglecam/run_cam.sh &" >> ~/.bashrc`
 
+Install BMP280 Barometric Pressure Sensor if added
+
+Instructions: https://iotstarters.com/configuring-bmp280-sensor-with-raspberry-pi
+
 #### Functions
 
 To add a function, create a new item in `functions.json`.

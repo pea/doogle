@@ -5,3 +5,5 @@ python-vlc
 imageio
 imageio-ffmpeg
 pillow
+python-dotenv
+flask

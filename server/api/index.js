@@ -44,6 +44,7 @@ app.post('/message', async (req, res) => {
 app.post('/chat', upload, async (req, res) => {
   const audio = req.files?.['audio']?.[0]
   const image = req.files?.['image']?.[0]
+  const imageId = req.body?.imageId;
   const history = req.body.history;
   const userText = req.body?.text;
   const grammarTypescript = req.body?.grammar;
@@ -74,7 +75,14 @@ app.post('/chat', upload, async (req, res) => {
     const base64Image = image ? Buffer.from(image.buffer).toString('base64') : null;
 
     const getLlamaText = async () => {
-      const text = await llamaRequest({text: inputText, history, grammar, image: base64Image ?? undefined})
+
+      const text = await llamaRequest({
+        text: inputText,
+        history,
+        grammar,
+        image: base64Image ?? undefined,
+        imageId: imageId
+      })
 
       if (grammar && grammar !== '') {
         const parsedJson = () => {
@@ -194,13 +202,15 @@ function sttRequest(fileBuffer) {
     });
 }
 
-async function llamaRequest({text, image, history, grammar}) {
+async function llamaRequest({text, image, imageId, history, grammar}) {
   const prompt = history + '\nUser: ' + text + '\nDoogle:';
+
+  console.log(imageId)
 
   const data = {
     'stream': false,
     'n_predict': 400,
-    'temperature': 0.7,
+    'temperature': 0.1,
     'stop': ['</s>', 'Doogle:', 'User:'],
     'repeat_last_n': 256,
     'repeat_penalty': 1.18,
@@ -216,7 +226,7 @@ async function llamaRequest({text, image, history, grammar}) {
     'mirostat_eta': 0.1,
     'grammar': grammar,
     'n_probs': 0,
-    'image_data': image ? [{data: image, id: 10}] : [],
+    'image_data': image && imageId ? [{data: image, id: parseInt(imageId, 10)}] : [],
     'cache_prompt': true,
     'api_key': '',
     'slot_id': -1,

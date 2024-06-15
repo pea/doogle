@@ -25,8 +25,6 @@ from dotenv import load_dotenv
 from wakeword.openwakeword.openwakeword import OpenWakeWord
 from wakeword.porcupine.porcupine import Porcupine
 
-
-
 load_dotenv()
 
 debug = os.getenv('DOOGLE_DEBUG')
@@ -112,8 +110,13 @@ class ChatBot:
     self.setup_leds()
 
   def is_button_pressed(self):
-        if GPIO is not None:
-            return GPIO.input(27)
+    if GPIO is not None:
+      if GPIO.input(27) == 1:
+        return True
+      else:
+        return False
+    else:
+        return False
 
   def voice_detected(self):
     if (self.should_enable_voice_detection == True):
@@ -139,7 +142,8 @@ class ChatBot:
     is_detected_function_wakeword = len(detected_function_wakewords) > 0
     is_detected_heydoogle_wakeword = "hey_doogle" in detected_wakewords and len(detected_wakewords) == 1
 
-    if self.is_button_pressed():
+    if self.is_button_pressed() == True:
+      self.log(f'Button pressed')
       self.prev_volume = self.current_volume
       detected_wakewords = ["hey_doogle"]
       is_detected_heydoogle_wakeword = True
@@ -664,6 +668,13 @@ class ChatBot:
   def log(self, message):
     if debug:
       logging.info(f'{message}')
+
+      with open('openwakeword.log', 'r') as log:
+          lines = log.readlines()
+
+      if len(lines) > 1000:
+          with open('openwakeword.log', 'w') as log:
+              log.writelines(lines[1:])
 
 chatbot = ChatBot()
 chatbot.start()
