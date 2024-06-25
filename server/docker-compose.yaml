@@ -20,8 +20,8 @@ services:
       args:
         # MODEL_DOWNLOAD_URL: https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q5_K_S.gguf
 
-        MODEL_DOWNLOAD_URL: https://huggingface.co/mys/ggml_llava-v1.5-7b/resolve/main/ggml-model-q5_k.gguf
-        MMPROJ_DOWNLOAD_URL: https://huggingface.co/mys/ggml_llava-v1.5-7b/resolve/main/mmproj-model-f16.gguf
+        MODEL_DOWNLOAD_URL: https://huggingface.co/mys/ggml_llava-v1.5-13b/resolve/main/ggml-model-q5_k.gguf
+        MMPROJ_DOWNLOAD_URL: https://huggingface.co/mys/ggml_llava-v1.5-13b/resolve/main/mmproj-model-f16.gguf
     ports:
       - '7000:7000'
     # command: '--server -m /models/ggml-model-q4_k.gguf --mmproj /models/mmproj-model-f16.gguf -n 512 --n-gpu-layers 32 --port 7000 --host 0.0.0.0 --log-disable'

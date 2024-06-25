@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from database import Database
 from api import Api
 import threading
+import RPi.GPIO as GPIO
 
 try:
   from smbus2 import SMBus
@@ -47,6 +48,9 @@ class Cam:
     self.is_awaiting_response = False
     self.last_temperature = 0
     self.db = Database('activity.db')
+    self.is_fan_on = False
+
+    self.setup_fan()
 
     if is_temp_sensor_installed:
       self.bus = SMBus(1)
@@ -55,8 +59,22 @@ class Cam:
     else:
       self.log('Temperature sensor not found')
 
+  def setup_fan(self):
+    GPIO.setup(22, GPIO.OUT)
+
+  def turn_on_fan(self):
+    GPIO.output(22, GPIO.HIGH)
+    self.is_fan_on = True
+
+  def turn_off_fan(self):
+    GPIO.output(22, GPIO.LOW)
+    self.is_fan_on = False
+
   def capture_still(video_url, self):
     try:
+      if os.path.exists('./stills/snap00001.jpg'):
+        os.remove('./stills/snap00001.jpg')
+
       subprocess.call('cvlc http://192.168.0.150:8160 --video-filter=scene --vout=dummy --scene-format=jpg --scene-ratio=1000000 --scene-prefix=snap --scene-path=./stills --run-time=1 vlc://quit', shell=True)
 
       image = Image.open('./stills/snap00001.jpg')
@@ -112,14 +130,24 @@ class Cam:
     image = self.capture_still(self)
     imageId = int(datetime.datetime.now().timestamp())
     llm_message = self.llm_request(image, imageId)
-    self.db.add_item(datetime.datetime.now(), llm_message)
+    if llm_message is not None:
+      self.db.add_activity(datetime.datetime.now(), llm_message)
 
     if llm_message is not None:
       self.log(llm_message)
 
   def handle_temperature(self):
+    self.db.add_temperature(datetime.datetime.now(), self.bmp280.get_temperature(), 'on' if self.is_fan_on else 'off')
+
     if is_temp_sensor_installed and self.last_temperature != round(self.bmp280.get_temperature()):
       temperature = round(self.bmp280.get_temperature())
+
+      if temperature >= 50:
+        self.turn_on_fan()
+      
+      if temperature <= 40:
+        self.turn_off_fan()
+
       self.log(f'Temperature changed from {self.last_temperature}°C to {temperature}°C')
       self.last_temperature = temperature
 
