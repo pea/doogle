@@ -7,4 +7,5 @@ imageio-ffmpeg
 pillow
 python-dotenv
 flask
-flask-cors
+flask-
+python3-rpi.gpio

@@ -51,6 +51,10 @@ class Cam:
     self.is_fan_on = False
 
     self.setup_fan()
+    self.setup_leds()
+
+    self.test_fan()
+    self.test_leds()
 
     if is_temp_sensor_installed:
       self.bus = SMBus(1)
@@ -69,6 +73,25 @@ class Cam:
   def turn_off_fan(self):
     GPIO.output(22, GPIO.LOW)
     self.is_fan_on = False
+
+  def test_fan(self):
+    self.turn_on_fan()
+    time.sleep(1)
+    self.turn_off_fan()
+
+  def setup_leds(self):
+    GPIO.setup(23, GPIO.OUT)
+
+  def turn_on_leds(self):
+    GPIO.output(23, GPIO.HIGH)
+
+  def turn_off_leds(self):
+    GPIO.output(23, GPIO.LOW)
+
+  def test_leds(self):
+    self.turn_on_leds()
+    time.sleep(1)
+    self.turn_off_leds()
 
   def capture_still(video_url, self):
     try:
@@ -126,7 +149,6 @@ class Cam:
 
   def handle_motion(self):
     self.time_of_last_motion = datetime.datetime.now()
-
     image = self.capture_still(self)
     imageId = int(datetime.datetime.now().timestamp())
     llm_message = self.llm_request(image, imageId)
@@ -159,7 +181,14 @@ class Cam:
     while True:
       time.sleep(1)
       self.handle_temperature()
+
+      secs_since_last_motion = (datetime.datetime.now() - self.time_of_last_motion).total_seconds()
+
+      if secs_since_last_motion > 3:
+        self.turn_off_leds()
+
       if self.motion_sensor.motion_detected:
+        self.turn_on_leds()
         time_since_last_motion = datetime.datetime.now() - self.time_of_last_motion
 
         self.log('Motion detected')
