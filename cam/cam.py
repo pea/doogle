@@ -16,6 +16,8 @@ from database import Database
 from api import Api
 import threading
 import RPi.GPIO as GPIO
+import signal
+import re
 
 try:
   from smbus2 import SMBus
@@ -49,6 +51,10 @@ class Cam:
     self.last_temperature = 0
     self.db = Database('activity.db')
     self.is_fan_on = False
+    self.vlc_recording_process = None
+    self.currently_recording_video_filename = None
+    self.video_recording_start_time = None
+    self.time_of_last_temperature_save = datetime.datetime.now()
 
     self.setup_fan()
     self.setup_leds()
@@ -93,14 +99,55 @@ class Cam:
     time.sleep(1)
     self.turn_off_leds()
 
+  def run_subprocess(self, command):
+    try:
+        self.vlc_recording_process = subprocess.Popen(command, shell=True)
+    except Exception as e:
+        self.log(e)
+
+  def start_recording_video(self):
+    filename = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    self.currently_recording_video_filename = f'{filename}.webm'
+    rtsp_url = 'rtsp://localhost:8554/stream'
+    command = f'ffmpeg -i {rtsp_url} -c:v libvpx -c:a libvorbis ./videos/{self.currently_recording_video_filename}'
+    self.recording_process = subprocess.Popen(command, shell=True)
+
+  def get_video_duration(self, video_path):
+    command = [
+        'ffprobe', 
+        '-v', 'error', 
+        '-show_entries', 'format=duration', 
+        '-of', 'default=noprint_wrappers=1:nokey=1', 
+        video_path
+    ]
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    duration = float(result.stdout)
+    return duration
+
+  def stop_recording_video(self):
+    if self.vlc_recording_process is not None:
+      self.recording_process.terminate()
+      self.recording_process.wait()
+      self.log('Video recording stopped')
+    else:
+      return
+
+    video_length_seconds = self.get_video_duration(f'./videos/{self.currently_recording_video_filename}')
+
+    if video_length_seconds == 0 and os.path.exists(f'./videos/{self.currently_recording_video_filename}'):
+      os.remove(f'./videos/{self.currently_recording_video_filename}')
+      return
+
+    self.db.add_video(self.video_recording_start_time, f'{self.currently_recording_video_filename}', video_length_seconds)
+
   def capture_still(video_url, self):
     try:
-      if os.path.exists('./stills/snap00001.jpg'):
-        os.remove('./stills/snap00001.jpg')
+      if os.path.exists('./stills/snapshot.jpg'):
+        os.remove('./stills/snapshot.jpg')
 
-      subprocess.call('cvlc http://192.168.0.150:8160 --video-filter=scene --vout=dummy --scene-format=jpg --scene-ratio=1000000 --scene-prefix=snap --scene-path=./stills --run-time=1 vlc://quit', shell=True)
+      subprocess.call('ffmpeg -i rtsp://localhost:8554/stream -vframes 1 -q:v 2 ./stills/snapshot.jpg', shell=True)
 
-      image = Image.open('./stills/snap00001.jpg')
+      image = Image.open('./stills/snapshot.jpg')
       buffer = io.BytesIO()
       image.save(buffer, format='JPEG')
       image_bytes = buffer.getvalue()
@@ -150,6 +197,7 @@ class Cam:
   def handle_motion(self):
     self.time_of_last_motion = datetime.datetime.now()
     image = self.capture_still(self)
+    self.start_recording_video()
     imageId = int(datetime.datetime.now().timestamp())
     llm_message = self.llm_request(image, imageId)
     if llm_message is not None:
@@ -158,8 +206,15 @@ class Cam:
     if llm_message is not None:
       self.log(llm_message)
 
+  def handle_motion_end(self):
+    self.turn_off_leds()
+    self.stop_recording_video()
+    self.log('Motion ended')
+
   def handle_temperature(self):
-    self.db.add_temperature(datetime.datetime.now(), self.bmp280.get_temperature(), 'on' if self.is_fan_on else 'off')
+    if (datetime.datetime.now() - self.time_of_last_temperature_save).total_seconds() > 60:
+      self.db.add_temperature(datetime.datetime.now(), self.bmp280.get_temperature(), 'on' if self.is_fan_on else 'off')
+      self.time_of_last_temperature_save = datetime.datetime.now()
 
     if is_temp_sensor_installed and self.last_temperature != round(self.bmp280.get_temperature()):
       temperature = round(self.bmp280.get_temperature())
@@ -184,8 +239,8 @@ class Cam:
 
       secs_since_last_motion = (datetime.datetime.now() - self.time_of_last_motion).total_seconds()
 
-      if secs_since_last_motion > 3:
-        self.turn_off_leds()
+      if secs_since_last_motion > 30:
+        self.handle_motion_end()
 
       if self.motion_sensor.motion_detected:
         self.turn_on_leds()

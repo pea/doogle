@@ -1,4 +1,4 @@
-.PHONY: install-nginx setup-nginx restart-nginx setup-reverse-proxy
+.PHONY: install-nginx setup-nginx restart-nginx setup-reverse-proxy setup-mediamtx start-mediamtx install update
 
 # Define the path to your Nginx configuration for the stream
 NGINX_CONF=/etc/nginx/sites-available/mjpeg_stream
@@ -16,16 +16,15 @@ setup-nginx: install-nginx
 	@echo "server { \
 		listen 80; \
 		server_name localhost; \
-		location / { \
-		proxy_pass http://localhost:8160; \
-		add_header 'Access-Control-Allow-Origin' '*'; \
-		add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS'; \
-		add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range'; \
-		add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range'; \
-		add_header 'Content-Type' 'video/webm'; \
-		add_header 'Cache-Control' 'no-cache, no-store, must-revalidate'; \
-		add_header 'Pragma' 'no-cache'; \
-		add_header 'Expires' '0'; \
+		location /stream/ { \
+		proxy_pass http://localhost:8889/stream/; \
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+    proxy_set_header Host $host; \
+    proxy_set_header X-Forwarded-Proto $scheme; \
+ 		\
+		limit_except GET POST PATCH DELETE OPTIONS { \
+			deny all; \
+		} \
 		} \
 		}" | sudo tee $(NGINX_CONF)
 	# Ensure the mjpeg_stream configuration is enabled
@@ -41,8 +40,24 @@ restart-nginx:
 
 setup-reverse-proxy: setup-nginx restart-nginx
 
+setup-mediamtx:
+	sudo apt update
+	sudo apt upgrade -y
+	wget https://github.com/bluenviron/mediamtx/releases/download/v1.8.3/mediamtx_v1.8.3_linux_arm64v8.tar.gz
+	tar -xzvf mediamtx_v1.8.3_linux_arm64v8.tar.gz
+	sudo mv mediamtx /usr/local/bin/
+	sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+	sudo rm mediamtx_v1.8.3_linux_arm64v8.tar.gz
+
+start-mediamtx:
+	@nohup sudo /usr/local/bin/mediamtx mediamtx.yml &
+
+restart-mediamtx:
+	@sudo pkill mediamtx
+	@make start-mediamtx
+
 install:
-	/bin/bash -c "python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+	/bin/bash -c "python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt" && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y mediainfo python3-lgpio && make setup-mediamtx
 
 update:
 	zip -r cam.zip . -x "*.git*" -x "*.DS_Store" -x "*.vscode*" -x "*.env*" && scp cam.zip dooglecam@dooglecam.local: && rm cam.zip && ssh dooglecam@dooglecam.local "unzip -o cam.zip && rm cam.zip && chmod +x cam.py run_cam.sh run_stream.sh && sudo reboot"

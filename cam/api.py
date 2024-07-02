@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, send_file
 from flask_cors import CORS
 from database import Database
 
@@ -22,14 +22,29 @@ class Api:
     @self.app.route('/temperature', methods=['GET'])
     def get_temperature():
       page = request.args.get('page', default=1, type=int)
-      response = self.db.get_all_temperature(1000, page)
+      per_page = request.args.get('per_page', default=1000, type=int)
+      response = self.db.get_all_temperature(per_page, page)
       return response, 200, {'Content-Type': 'application/json'}
     
     @self.app.route('/activity', methods=['GET'])
     def get_activity():
       page = request.args.get('page', default=1, type=int)
-      response = self.db.get_all_activity(100, page)
+      per_page = request.args.get('per_page', default=100, type=int)
+      response = self.db.get_all_activity(per_page, page)
       return response, 200, {'Content-Type': 'application/json'}
-
+    
+    @self.app.route('/videos', methods=['GET'])
+    def get_videos():
+      page = request.args.get('page', default=1, type=int)
+      per_page = request.args.get('per_page', default=10, type=int)
+      response = self.db.get_all_videos(per_page, page)
+      return response, 200, {'Content-Type': 'application/json'}
+    
+    @self.app.route('/video', methods=['GET'])
+    def get_video():
+      filename = request.args.get('filename')
+      file_path = f'videos/{filename}'
+      return send_file(file_path, mimetype='video/mp4')
+      
   def start_server(self):
     self.app.run(host='0.0.0.0', port=5000)

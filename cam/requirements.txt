@@ -1,11 +1,9 @@
 requests
 numpy
-RPi.GPIO
 python-vlc
 imageio
 imageio-ffmpeg
 pillow
 python-dotenv
 flask
-flask-
-python3-rpi.gpio
+rpi-lgpio

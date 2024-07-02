@@ -6,7 +6,7 @@ class MotionSensor:
   def __init__(self, sensor_pin=27):
     # Set up GPIO
     GPIO.setmode(GPIO.BCM)
-    GPIO.setwarnings(False)
+    GPIO.setwarnings(True)
 
     # Set up pins
     self.sensor_pin = sensor_pin

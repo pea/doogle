@@ -22,6 +22,13 @@ class Database:
           temperature REAL,
           fan_status TEXT
         )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS videos (
+          datetime TEXT,
+          filename TEXT,
+          length FLOAT
+        )
         '''
     ]
     try:
@@ -54,6 +61,32 @@ class Database:
         print(f"Error adding item: {e}", file=sys.stdout)
 
     self.limit_table_rows('temperature', 259200)
+
+  def add_video(self, datetime, filename, length):
+    query = '''
+    INSERT INTO videos (datetime, filename, length)
+    VALUES (?, ?, ?)
+    '''
+    try:
+        self.conn.execute(query, (datetime, filename, length))
+        self.conn.commit()
+    except Exception as e:
+        print(f"Error adding item: {e}", file=sys.stdout)
+        
+  def get_all_videos(self, page_size, page_number):
+    query = '''
+    SELECT * FROM videos
+    ORDER BY datetime DESC
+    LIMIT ? OFFSET ?
+    '''
+    try:
+        offset = (page_number - 1) * page_size
+        cursor = self.conn.execute(query, (page_size, offset))
+        columns = [column[0] for column in cursor.description]
+        items = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return json.dumps(items)
+    except Exception as e:
+        print(f"Error retrieving items: {e}", file=sys.stdout)
 
   def get_all_activity(self, page_size, page_number):
     query = '''
