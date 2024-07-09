@@ -7,3 +7,4 @@ pillow
 python-dotenv
 flask
 rpi-lgpio
+psutil

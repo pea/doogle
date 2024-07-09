@@ -212,7 +212,7 @@ playbackAllowOrigin: '*'
 # List of IPs or CIDRs of proxies placed before the HTTP server.
 # If the server receives a request from one of these entries, IP in logs
 # will be taken from the X-Forwarded-For header.
-playbackTrustedProxies: ['127.0.0.1', '::1']
+playbackTrustedProxies: []
 
 ###############################################
 # Global settings -> RTSP server
@@ -362,7 +362,7 @@ webrtcLocalUDPAddress: :8189
 # Address of a local TCP listener that will receive connections.
 # This is disabled by default since TCP is less efficient than UDP and
 # introduces a progressive delay when network is congested.
-webrtcLocalTCPAddress: ''
+webrtcLocalTCPAddress: :8189
 # WebRTC clients need to know the IP of the server.
 # Gather IPs from interfaces and send them to clients.
 webrtcIPsFromInterfaces: yes
@@ -688,13 +688,9 @@ pathDefaults:
 # for example "~^(test1|test2)$" will match both "test1" and "test2",
 # for example "~^prefix" will match all paths that start with "prefix".
 paths:
-  # example:
-  # my_camera:
-  #   source: rtsp://my_camera
-
-  # Settings under path "all_others" are applied to all paths that
-  # do not match another entry.
   stream:
     runOnInit: bash -c 'rpicam-vid -t 0 --camera 0 --nopreview --codec yuv420 --width 640 --height 480 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 640x480 -r 25 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -b:v 1500k -g 30 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
     runOnInitRestart: yes
+  proxied:
+    source: http://localhost/stream/index.m3u8
   all_others:

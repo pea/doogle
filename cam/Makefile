@@ -17,14 +17,12 @@ setup-nginx: install-nginx
 		listen 80; \
 		server_name localhost; \
 		location /stream/ { \
-		proxy_pass http://localhost:8889/stream/; \
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
-    proxy_set_header Host $host; \
-    proxy_set_header X-Forwarded-Proto $scheme; \
- 		\
-		limit_except GET POST PATCH DELETE OPTIONS { \
-			deny all; \
-		} \
+			proxy_pass http://localhost:8889/stream/; \
+			proxy_http_version 1.1; \
+			proxy_set_header Host \$host; \
+			proxy_set_header X-Real-IP \$remote_addr; \
+			proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; \
+			proxy_set_header X-Forwarded-Proto \$scheme; \
 		} \
 		}" | sudo tee $(NGINX_CONF)
 	# Ensure the mjpeg_stream configuration is enabled

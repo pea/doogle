@@ -16,8 +16,7 @@ from database import Database
 from api import Api
 import threading
 import RPi.GPIO as GPIO
-import signal
-import re
+import psutil
 
 try:
   from smbus2 import SMBus
@@ -54,7 +53,9 @@ class Cam:
     self.vlc_recording_process = None
     self.currently_recording_video_filename = None
     self.video_recording_start_time = None
-    self.time_of_last_temperature_save = datetime.datetime.now()
+    self.time_of_last_temperature_save = datetime.datetime.now() - datetime.timedelta(seconds=999)
+    self.time_of_last_system_info_save = datetime.datetime.now() - datetime.timedelta(seconds=999)
+    self.recording_process = None
 
     self.setup_fan()
     self.setup_leds()
@@ -82,7 +83,7 @@ class Cam:
 
   def test_fan(self):
     self.turn_on_fan()
-    time.sleep(1)
+    time.sleep(3)
     self.turn_off_fan()
 
   def setup_leds(self):
@@ -99,46 +100,68 @@ class Cam:
     time.sleep(1)
     self.turn_off_leds()
 
-  def run_subprocess(self, command):
-    try:
-        self.vlc_recording_process = subprocess.Popen(command, shell=True)
-    except Exception as e:
-        self.log(e)
+  def log_system_info(self):
+    if (datetime.datetime.now() - self.time_of_last_system_info_save).total_seconds() < 60:
+      return
+
+    cpu_usage = psutil.cpu_percent()
+    ram_usage = psutil.virtual_memory().percent
+    disk_usage = psutil.disk_usage('/').percent
+    raspberry_pi_temperature = self.get_pi_temperature()
+
+    self.db.add_system_info(
+      datetime.datetime.now(), 
+      cpu_usage,
+      ram_usage,
+      disk_usage,
+      raspberry_pi_temperature
+    )
+
+    self.time_of_last_system_info_save = datetime.datetime.now()
+
+  def get_pi_temperature(self):
+    process = subprocess.Popen(['vcgencmd', 'measure_temp'], stdout=subprocess.PIPE)
+    output, _ = process.communicate()
+    temperature = output.decode()
+    temperature = temperature.replace('temp=', '').replace('\'C\n', '')
+    return float(temperature)
 
   def start_recording_video(self):
+    # Generate filename based on current datetime
     filename = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     self.currently_recording_video_filename = f'{filename}.webm'
     rtsp_url = 'rtsp://localhost:8554/stream'
-    command = f'ffmpeg -i {rtsp_url} -c:v libvpx -c:a libvorbis ./videos/{self.currently_recording_video_filename}'
-    self.recording_process = subprocess.Popen(command, shell=True)
+    output_filename = f"./videos/{self.currently_recording_video_filename}"
+    
+    # Log start of recording
+    self.log(f'Starting video recording to {output_filename}')
+    self.video_recording_start_time = datetime.datetime.now()
 
-  def get_video_duration(self, video_path):
-    command = [
-        'ffprobe', 
-        '-v', 'error', 
-        '-show_entries', 'format=duration', 
-        '-of', 'default=noprint_wrappers=1:nokey=1', 
-        video_path
-    ]
-    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    duration = float(result.stdout)
-    return duration
+    # Define the recording command with detailed ffmpeg options
+    command = f'ffmpeg -rtsp_transport tcp -i {rtsp_url} -c:v libvpx-vp9 -s:v 640x480 -r 25 -b:v 1500k -g 30 -c:a libvorbis -bufsize 3000k -fflags +discardcorrupt -reconnect 1 {output_filename}'
+
+    # Define a function to run the recording command in a subprocess
+    def record_video():
+        self.recording_process = subprocess.Popen(command, shell=True)
+
+    # Start the recording in a new thread
+    self.recording_thread = threading.Thread(target=record_video)
+    self.recording_thread.start()
 
   def stop_recording_video(self):
-    if self.vlc_recording_process is not None:
-      self.recording_process.terminate()
-      self.recording_process.wait()
-      self.log('Video recording stopped')
-    else:
+    if self.recording_process:
+        self.recording_process.terminate()
+        self.recording_thread.join()
+        self.log("Video recording stopped.")
+
+    if self.currently_recording_video_filename is None:
       return
 
-    video_length_seconds = self.get_video_duration(f'./videos/{self.currently_recording_video_filename}')
+    self.log(f'Saving video {self.currently_recording_video_filename} with duration 0.0 seconds')
 
-    if video_length_seconds == 0 and os.path.exists(f'./videos/{self.currently_recording_video_filename}'):
-      os.remove(f'./videos/{self.currently_recording_video_filename}')
-      return
+    self.db.add_video(self.video_recording_start_time, f'{self.currently_recording_video_filename}', 0.0)
 
-    self.db.add_video(self.video_recording_start_time, f'{self.currently_recording_video_filename}', video_length_seconds)
+    self.currently_recording_video_filename = None
 
   def capture_still(video_url, self):
     try:
@@ -213,16 +236,20 @@ class Cam:
 
   def handle_temperature(self):
     if (datetime.datetime.now() - self.time_of_last_temperature_save).total_seconds() > 60:
-      self.db.add_temperature(datetime.datetime.now(), self.bmp280.get_temperature(), 'on' if self.is_fan_on else 'off')
+      self.db.add_temperature(
+        datetime.datetime.now(),
+        round(self.bmp280.get_temperature(), 2),
+        'on' if self.is_fan_on else 'off'
+      )
       self.time_of_last_temperature_save = datetime.datetime.now()
 
     if is_temp_sensor_installed and self.last_temperature != round(self.bmp280.get_temperature()):
       temperature = round(self.bmp280.get_temperature())
 
-      if temperature >= 50:
+      if self.get_pi_temperature() >= 70:
         self.turn_on_fan()
-      
-      if temperature <= 40:
+
+      if self.get_pi_temperature() < 60:
         self.turn_off_fan()
 
       self.log(f'Temperature changed from {self.last_temperature}°C to {temperature}°C')
@@ -236,10 +263,11 @@ class Cam:
     while True:
       time.sleep(1)
       self.handle_temperature()
+      self.log_system_info()
 
       secs_since_last_motion = (datetime.datetime.now() - self.time_of_last_motion).total_seconds()
 
-      if secs_since_last_motion > 30:
+      if secs_since_last_motion > 10:
         self.handle_motion_end()
 
       if self.motion_sensor.motion_detected:

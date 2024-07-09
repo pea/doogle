@@ -45,6 +45,13 @@ class Api:
       filename = request.args.get('filename')
       file_path = f'videos/{filename}'
       return send_file(file_path, mimetype='video/mp4')
+    
+    @self.app.route('/system_info', methods=['GET'])
+    def get_system_info():
+      page = request.args.get('page', default=1, type=int)
+      per_page = request.args.get('per_page', default=100, type=int)
+      response = self.db.get_all_system_info(per_page, page)
+      return response, 200, {'Content-Type': 'application/json'}
       
   def start_server(self):
     self.app.run(host='0.0.0.0', port=5000)

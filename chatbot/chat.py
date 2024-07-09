@@ -184,7 +184,7 @@ class ChatBot:
     if is_detected_heydoogle_wakeword:
       self.should_record = True
       self.time_last_voice_detected = time.time()
-      self.seconds_wait_speak = 1.5
+      self.seconds_wait_speak = 3
       self.log(f'Hey Doogle wakeword detected')
 
     if self.should_record and not self.is_recording:
