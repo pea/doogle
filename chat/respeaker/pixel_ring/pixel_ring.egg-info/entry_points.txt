@@ -1,0 +1,2 @@
+[console_scripts]
+pixel_ring_check = pixel_ring.__init__:main

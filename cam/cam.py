@@ -15,15 +15,9 @@ from dotenv import load_dotenv
 from database import Database
 from api import Api
 import threading
-import RPi.GPIO as GPIO
 import psutil
-
-try:
-  from smbus2 import SMBus
-  from bmp280 import BMP280
-  is_temp_sensor_installed = True
-except ImportError:
-  is_temp_sensor_installed = False
+from ir_leds import ir_leds
+from mediamtx_yml_updater import MediaMatrixUpdater
 
 load_dotenv()
 
@@ -31,10 +25,10 @@ prompt = os.getenv('PROMPT')
 query = os.getenv('QUERY')
 description_frequency = os.getenv('DESCRIPTION_FREQUENCY')
 debug = os.getenv('DEBUG')
+doogle_server_host = os.getenv('DOOGLE_SERVER_HOST')
 
 class Cam:
   def __init__(self):
-    # Set up logging
     self.logger = logging.getLogger('Cam')
     self.logger.setLevel(logging.INFO)
     handler = logging.FileHandler('cam.log')
@@ -49,56 +43,20 @@ class Cam:
     self.is_awaiting_response = False
     self.last_temperature = 0
     self.db = Database('activity.db')
-    self.is_fan_on = False
     self.vlc_recording_process = None
     self.currently_recording_video_filename = None
     self.video_recording_start_time = None
     self.time_of_last_temperature_save = datetime.datetime.now() - datetime.timedelta(seconds=999)
     self.time_of_last_system_info_save = datetime.datetime.now() - datetime.timedelta(seconds=999)
     self.recording_process = None
+    self.uptime = datetime.datetime.now()
+    self.is_recording_video = False
+    self.is_capture_still = False
 
-    self.setup_fan()
-    self.setup_leds()
+    self.start_streaming_server()
 
-    self.test_fan()
-    self.test_leds()
-
-    if is_temp_sensor_installed:
-      self.bus = SMBus(1)
-      self.bmp280 = BMP280(i2c_dev=self.bus)
-      self.log('Temperature sensor initialized')
-    else:
-      self.log('Temperature sensor not found')
-
-  def setup_fan(self):
-    GPIO.setup(22, GPIO.OUT)
-
-  def turn_on_fan(self):
-    GPIO.output(22, GPIO.HIGH)
-    self.is_fan_on = True
-
-  def turn_off_fan(self):
-    GPIO.output(22, GPIO.LOW)
-    self.is_fan_on = False
-
-  def test_fan(self):
-    self.turn_on_fan()
-    time.sleep(3)
-    self.turn_off_fan()
-
-  def setup_leds(self):
-    GPIO.setup(23, GPIO.OUT)
-
-  def turn_on_leds(self):
-    GPIO.output(23, GPIO.HIGH)
-
-  def turn_off_leds(self):
-    GPIO.output(23, GPIO.LOW)
-
-  def test_leds(self):
-    self.turn_on_leds()
-    time.sleep(1)
-    self.turn_off_leds()
+    self.ir_leds = ir_leds()
+    self.ir_leds.test_leds()
 
   def log_system_info(self):
     if (datetime.datetime.now() - self.time_of_last_system_info_save).total_seconds() < 60:
@@ -127,24 +85,23 @@ class Cam:
     return float(temperature)
 
   def start_recording_video(self):
-    # Generate filename based on current datetime
+    if self.is_recording_video:
+      return
+
+    self.is_recording_video = True
     filename = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     self.currently_recording_video_filename = f'{filename}.webm'
     rtsp_url = 'rtsp://localhost:8554/stream'
     output_filename = f"./videos/{self.currently_recording_video_filename}"
     
-    # Log start of recording
     self.log(f'Starting video recording to {output_filename}')
     self.video_recording_start_time = datetime.datetime.now()
 
-    # Define the recording command with detailed ffmpeg options
-    command = f'ffmpeg -rtsp_transport tcp -i {rtsp_url} -c:v libvpx-vp9 -s:v 640x480 -r 25 -b:v 1500k -g 30 -c:a libvorbis -bufsize 3000k -fflags +discardcorrupt -reconnect 1 {output_filename}'
+    command = f'ffmpeg -rtsp_transport tcp -i {rtsp_url} -c:v libvpx-vp9 -s:v 640x480 -r 15 -b:v 1500k -g 30 -c:a libvorbis -bufsize 3000k -preset ultrafast -crf 30 -fflags +discardcorrupt -reconnect 1 {output_filename}'
 
-    # Define a function to run the recording command in a subprocess
     def record_video():
         self.recording_process = subprocess.Popen(command, shell=True)
 
-    # Start the recording in a new thread
     self.recording_thread = threading.Thread(target=record_video)
     self.recording_thread.start()
 
@@ -152,7 +109,6 @@ class Cam:
     if self.recording_process:
         self.recording_process.terminate()
         self.recording_thread.join()
-        self.log("Video recording stopped.")
 
     if self.currently_recording_video_filename is None:
       return
@@ -163,7 +119,14 @@ class Cam:
 
     self.currently_recording_video_filename = None
 
+    self.is_recording_video = False
+
   def capture_still(video_url, self):
+    if self.is_capture_still:
+      return None
+
+    self.is_capture_still = True
+
     try:
       if os.path.exists('./stills/snapshot.jpg'):
         os.remove('./stills/snapshot.jpg')
@@ -177,6 +140,8 @@ class Cam:
       return image_bytes
     except Exception as e:
       self.log(e)
+
+    self.is_capture_still = False
     
   def llm_request(self, image, imageId):
     if image is None:
@@ -197,7 +162,7 @@ class Cam:
       self.is_awaiting_response
       self.log('Sending image to LLM')
       response = requests.post(
-          'http://192.168.0.131:4000/chat',
+          f'http://{doogle_server_host}:4000/chat',
           headers=None,
           files=files,
           data=data,
@@ -230,48 +195,91 @@ class Cam:
       self.log(llm_message)
 
   def handle_motion_end(self):
-    self.turn_off_leds()
+    if self.ir_led_behavior() == 'auto':
+      self.ir_leds.turn_off_leds()
+
     self.stop_recording_video()
-    self.log('Motion ended')
-
-  def handle_temperature(self):
-    if (datetime.datetime.now() - self.time_of_last_temperature_save).total_seconds() > 60:
-      self.db.add_temperature(
-        datetime.datetime.now(),
-        round(self.bmp280.get_temperature(), 2),
-        'on' if self.is_fan_on else 'off'
-      )
-      self.time_of_last_temperature_save = datetime.datetime.now()
-
-    if is_temp_sensor_installed and self.last_temperature != round(self.bmp280.get_temperature()):
-      temperature = round(self.bmp280.get_temperature())
-
-      if self.get_pi_temperature() >= 70:
-        self.turn_on_fan()
-
-      if self.get_pi_temperature() < 60:
-        self.turn_off_fan()
-
-      self.log(f'Temperature changed from {self.last_temperature}°C to {temperature}°C')
-      self.last_temperature = temperature
 
   def log(self, message):
     if debug:
       self.logger.info(message)
+
+  def ir_led_behavior(self):
+    settings = self.db.get_settings()
+    if settings is None:
+        return 'auto'
+    
+    if isinstance(settings, str):
+        try:
+            settings = json.loads(settings)
+        except json.JSONDecodeError:
+            return 'auto'
+    
+    if isinstance(settings, list):
+        if not settings:
+            return 'auto'
+        settings = settings[0]
+    
+    return settings.get('ir_led_behavior', 'auto')
+
+  def stop_streaming_server(self):
+    subprocess.run('sudo pkill -f mediamtx', shell=True)
+
+  def start_streaming_server(self):
+    presets = {
+      'daytime': {
+        'brightness': 0.1,
+        'contrast': 1.0
+      },
+      'nighttime': {
+        'brightness': 0.6,
+        'contrast': 1.9
+      }
+    }
+
+    preset = 'daytime'
+
+    brightness = str(presets[preset]['brightness'])
+    contrast = str(presets[preset]['contrast'])
+
+    command = f'sudo BRIGHTNESS="{brightness}" CONTRAST="{contrast}" /usr/local/bin/mediamtx mediamtx.yml &'
+
+    self.stop_streaming_server()
+    threading.Thread(target=lambda: subprocess.run(command, shell=True)).start()
+
+  def handle_overheating(self):
+    if self.get_pi_temperature() >= 65:
+      self.log('Raspberry Pi is overheating. Stopping streaming server.')
+      self.stop_streaming_server()
+      
+      self.log('Waiting for Raspberry Pi to cool down...')
+      while self.get_pi_temperature() > 60:
+          time.sleep(30)
+      
+      self.log('Raspberry Pi has cooled down. Starting streaming server.')
+      self.start_streaming_server()
       
   def start(self):
     while True:
       time.sleep(1)
-      self.handle_temperature()
+      self.handle_overheating()
       self.log_system_info()
 
       secs_since_last_motion = (datetime.datetime.now() - self.time_of_last_motion).total_seconds()
+
+      if self.ir_led_behavior() == 'on':
+        self.ir_leds.turn_on_leds()
+
+      if self.ir_led_behavior() == 'off':
+        self.ir_leds.turn_off_leds()
 
       if secs_since_last_motion > 10:
         self.handle_motion_end()
 
       if self.motion_sensor.motion_detected:
-        self.turn_on_leds()
+        if self.ir_led_behavior() == 'auto':
+          self.ir_leds.turn_on_leds()
+
         time_since_last_motion = datetime.datetime.now() - self.time_of_last_motion
 
         self.log('Motion detected')

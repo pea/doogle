@@ -7,6 +7,7 @@ class Database:
   def __init__(self, db_name):
     self.db_name = db_name
     self.conn = sqlite3.connect(db_name, check_same_thread=False)
+    self.delete_table('settings')
     self.create_tables() 
 
   def create_tables(self):
@@ -39,6 +40,15 @@ class Database:
           disk REAL,
           raspberry_pi_temperature REAL
         )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS settings (
+          ir_led_behavior TEXT
+        )
+        ''',
+        '''
+        INSERT OR IGNORE INTO settings (ir_led_behavior)
+        VALUES ('auto')
         '''
     ]
     try:
@@ -103,6 +113,29 @@ class Database:
         self.conn.commit()
     except Exception as e:
         print(f"Error adding item: {e}", file=sys.stdout)
+
+  def update_setting(self, column, value):
+    query = f'''
+    UPDATE settings
+    SET {column} = ?
+    '''
+    try:
+        self.conn.execute(query, (value,))
+        self.conn.commit()
+    except Exception as e:
+        print(f"Error updating item: {e}", file=sys.stdout)
+
+  def get_settings(self):
+    query = '''
+    SELECT * FROM settings
+    '''
+    try:
+        cursor = self.conn.execute(query)
+        columns = [column[0] for column in cursor.description]
+        items = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return json.dumps(items)
+    except Exception as e:
+        print(f"Error retrieving items: {e}", file=sys.stdout)
 
   def get_all_system_info(self, page_size, page_number):
     query = '''

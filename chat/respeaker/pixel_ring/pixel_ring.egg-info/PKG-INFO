@@ -1,0 +1,22 @@
+Metadata-Version: 2.1
+Name: pixel-ring
+Version: 0.1.0
+Summary: respeaker series pixel ring library
+Home-page: https://github.com/respeaker/pixel_ring
+Author: Yihui Xiong
+Author-email: yihui.xiong@hotmail.com
+License: GNU General Public License v2
+Keywords: voice doa beamforming kws
+Classifier: Development Status :: 2 - Pre-Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: GNU General Public License v2 (GPLv2)
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+
+
+RGB LED library for ReSpeaker USB 6+1 Microphone Array, 4 Mic Array for Raspberry Pi
+to control the pixel ring

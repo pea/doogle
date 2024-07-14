@@ -8,3 +8,5 @@ python-dotenv
 flask
 rpi-lgpio
 psutil
+PyYAML
+flask_cors

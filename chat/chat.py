@@ -28,7 +28,7 @@ from wakeword.porcupine.porcupine import Porcupine
 load_dotenv()
 
 debug = os.getenv('DOOGLE_DEBUG')
-apihost = os.getenv('API_HOST')
+doogle_server_host = os.getenv('DOOGLE_SERVER_HOST')
 wakeword_library = os.getenv('WAKEWORD_LIBRARY')
 porcupine_access_key = os.getenv('PORCUPINE_ACCESS_KEY')
 conversation_mode = os.getenv('CONVERSATION_MODE')
@@ -376,7 +376,7 @@ class ChatBot:
 
       try:
         response = requests.post(
-          f'http://{apihost}:4000/chat',
+          f'http://{doogle_server_host}:4000/chat',
           headers=None,
           json=data,
           timeout=15
@@ -409,7 +409,7 @@ class ChatBot:
 
       try:
         response = requests.post(
-          f'http://{apihost}:4000/chat',
+          f'http://{doogle_server_host}:4000/chat',
           headers=None,
           json=data,
           timeout=15
@@ -581,7 +581,7 @@ class ChatBot:
     
     try:
       response = requests.post(
-        f'http://{apihost}:4000/tts',
+        f'http://{doogle_server_host}:4000/tts',
         headers=None,
         json=data,
         timeout=15
@@ -606,7 +606,7 @@ class ChatBot:
 
     try:
       response = requests.post(
-        f'http://{apihost}:6060/inference',
+        f'http://{doogle_server_host}:6060/inference',
         headers=None,
         files=files,
         timeout=15

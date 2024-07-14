@@ -687,10 +687,11 @@ pathDefaults:
 # It's possible to use regular expressions by using a tilde as prefix,
 # for example "~^(test1|test2)$" will match both "test1" and "test2",
 # for example "~^prefix" will match all paths that start with "prefix".
+
+# Brightness/ contrast for daylight: -vf "eq=brightness=0.1:contrast=1"
+# Brightness/ contrast for night: -vf "eq=brightness=0.6:contrast=1.9"
 paths:
   stream:
-    runOnInit: bash -c 'rpicam-vid -t 0 --camera 0 --nopreview --codec yuv420 --width 640 --height 480 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 640x480 -r 25 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -b:v 1500k -g 30 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
+    runOnInit: bash -c 'rpicam-vid -t 0 --camera 0 --nopreview --codec yuv420 --width 640 --height 480 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 640x480 -r 15 -i /dev/stdin -vf "eq=brightness=$BRIGHTNESS:contrast=$CONTRAST" -c:v libx264 -preset ultrafast -tune zerolatency -b:v 1500k -g 30 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
     runOnInitRestart: yes
-  proxied:
-    source: http://localhost/stream/index.m3u8
   all_others:

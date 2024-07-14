@@ -18,13 +18,6 @@ class Api:
     if is_temp_sensor_installed:
       self.bus = SMBus(1)
       self.bmp280 = BMP280(i2c_dev=self.bus)
-
-    @self.app.route('/temperature', methods=['GET'])
-    def get_temperature():
-      page = request.args.get('page', default=1, type=int)
-      per_page = request.args.get('per_page', default=1000, type=int)
-      response = self.db.get_all_temperature(per_page, page)
-      return response, 200, {'Content-Type': 'application/json'}
     
     @self.app.route('/activity', methods=['GET'])
     def get_activity():
@@ -52,6 +45,23 @@ class Api:
       per_page = request.args.get('per_page', default=100, type=int)
       response = self.db.get_all_system_info(per_page, page)
       return response, 200, {'Content-Type': 'application/json'}
+    
+    @self.app.route('/ir_leds', methods=['POST'])
+    def post_ir():
+      data = request.get_json()
+      if data.get('ir_behaviour') == 'on':
+        self.db.update_setting('ir_led_behavior', 'on')
+        return '', 200
+      
+      if data.get('ir_behaviour') == 'off':
+        self.db.update_setting('ir_led_behavior', 'off')
+        return '', 200
+
+      if data.get('ir_behaviour') == 'auto':
+        self.db.update_setting('ir_led_behavior', 'auto')
+        return '', 200
+        
+      return '', 400
       
   def start_server(self):
     self.app.run(host='0.0.0.0', port=5000)
