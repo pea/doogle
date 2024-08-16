@@ -683,7 +683,6 @@ class ChatBot:
 
   def handle_button_press(self):
     self.is_button_pressed = True
-    print("Button pressed")
 
 chatbot = ChatBot()
 chatbot.start()
