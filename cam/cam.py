@@ -1,6 +1,7 @@
 #!/home/dooglecam/.venv/bin/python3
 
 from motion_sensor import MotionSensor
+from light_sensor import LightSensor
 import time
 import subprocess
 import requests
@@ -39,6 +40,10 @@ class Cam:
 
     self.motion_sensor = MotionSensor()
     self.motion_sensor.start()
+
+    self.light_sensor = LightSensor()
+    self.light_sensor.start()
+
     self.time_of_last_motion = datetime.datetime.now() - datetime.timedelta(seconds=999)
     self.is_awaiting_response = False
     self.last_temperature = 0
@@ -52,8 +57,8 @@ class Cam:
     self.uptime = datetime.datetime.now()
     self.is_recording_video = False
     self.is_capture_still = False
-
-    self.start_streaming_server()
+    self.current_video_streaming_preset = None
+    self.last_light_status = False
 
     self.ir_leds = ir_leds()
     self.ir_leds.test_leds()
@@ -226,6 +231,8 @@ class Cam:
     subprocess.run('sudo pkill -f mediamtx', shell=True)
 
   def start_streaming_server(self):
+    is_light = self.light_sensor.light_detected
+
     presets = {
       'daytime': {
         'brightness': 0.1,
@@ -237,15 +244,30 @@ class Cam:
       }
     }
 
-    preset = 'daytime'
+    if is_light:
+      preset = 'daytime'
+    else:
+      preset = 'nighttime'
 
-    brightness = str(presets[preset]['brightness'])
-    contrast = str(presets[preset]['contrast'])
+    is_running = subprocess.run('pgrep -f mediamtx', shell=True).returncode == 0
+    is_present_updated = self.current_video_streaming_preset != preset
 
-    command = f'sudo BRIGHTNESS="{brightness}" CONTRAST="{contrast}" /usr/local/bin/mediamtx mediamtx.yml &'
+    if not is_running:
+      self.log('Streaming server is not running. Starting streaming server.')
 
-    self.stop_streaming_server()
-    threading.Thread(target=lambda: subprocess.run(command, shell=True)).start()
+    if is_present_updated:
+      self.log(f'Current preset: {self.current_video_streaming_preset}. New preset: {preset}. Updating preset.')
+
+    if not is_running or is_present_updated:
+      self.current_video_streaming_preset = preset
+
+      brightness = str(presets[preset]['brightness'])
+      contrast = str(presets[preset]['contrast'])
+
+      command = f'sudo BRIGHTNESS="{brightness}" CONTRAST="{contrast}" /usr/local/bin/mediamtx mediamtx.yml &'
+
+      self.stop_streaming_server()
+      threading.Thread(target=lambda: subprocess.run(command, shell=True)).start()
 
   def handle_overheating(self):
     if self.get_pi_temperature() >= 65:
@@ -258,12 +280,21 @@ class Cam:
       
       self.log('Raspberry Pi has cooled down. Starting streaming server.')
       self.start_streaming_server()
+
+  def handle_light_status(self):
+    if self.last_light_status != self.light_sensor.light_detected:
+      from_status = 'on' if self.last_light_status else 'off'
+      status = 'on' if self.light_sensor.light_detected else 'off'
+      self.log(f'Light status changed from {from_status} to {status}')
+      self.last_light_status = self.light_sensor.light_detected
       
   def start(self):
     while True:
       time.sleep(1)
+      self.start_streaming_server()
       self.handle_overheating()
       self.log_system_info()
+      self.handle_light_status()
 
       secs_since_last_motion = (datetime.datetime.now() - self.time_of_last_motion).total_seconds()
 
@@ -277,7 +308,7 @@ class Cam:
         self.handle_motion_end()
 
       if self.motion_sensor.motion_detected:
-        if self.ir_led_behavior() == 'auto':
+        if self.ir_led_behavior() == 'auto' and self.light_sensor.light_detected == False:
           self.ir_leds.turn_on_leds()
 
         time_since_last_motion = datetime.datetime.now() - self.time_of_last_motion
@@ -291,7 +322,6 @@ class Cam:
           continue
 
         self.handle_motion()
-
 
 api = Api()
 api_thread = threading.Thread(target=api.start_server)

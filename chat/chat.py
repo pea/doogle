@@ -24,6 +24,8 @@ import re
 from dotenv import load_dotenv
 from wakeword.openwakeword.openwakeword import OpenWakeWord
 from wakeword.porcupine.porcupine import Porcupine
+from amplifier import Amplifier
+from rotary_encoder import RotaryEncoder
 
 load_dotenv()
 
@@ -32,13 +34,6 @@ doogle_server_host = os.getenv('DOOGLE_SERVER_HOST')
 wakeword_library = os.getenv('WAKEWORD_LIBRARY')
 porcupine_access_key = os.getenv('PORCUPINE_ACCESS_KEY')
 conversation_mode = os.getenv('CONVERSATION_MODE')
-
-if os.path.isfile('chat.log'):
-  os.remove('chat.log')
-
-logging.basicConfig(filename='chat.log', level=logging.INFO, 
-                    format='%(asctime)s %(levelname)s: %(message)s', 
-                    datefmt='%m/%d/%Y %I:%M:%S %p')
 
 try:
   import RPi.GPIO as GPIO
@@ -51,6 +46,10 @@ except ImportError:
 
 class ChatBot:
   def __init__(self):
+    logging.basicConfig(filename='chat.log', level=logging.INFO, 
+                    format='%(asctime)s %(levelname)s: %(message)s', 
+                    datefmt='%m/%d/%Y %I:%M:%S %p')
+    
     self.CHUNK = 1020
     self.RATE = 16000
     self.p = pyaudio.PyAudio()
@@ -72,10 +71,16 @@ class ChatBot:
     self.seconds_wait_speak = 2
     self.current_volume = 0
     self.prev_volume = 80
+    self.is_button_pressed = False
+
+    self.amplifier = Amplifier(callback=lambda muted, error: self.log(f"Amplifier muted: {muted}. Error: {error}"))
+    self.rotary_encoder = RotaryEncoder(
+      button_callback=lambda: self.handle_button_press(),
+      rotation_callback=lambda rotation: self.set_volume(self.current_volume + (rotation * 5))
+    )
 
     if GPIO is not None:
       GPIO.setmode(GPIO.BCM)
-      GPIO.setup(27, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     if wakeword_library == 'porcupine':
       self.wakeword = Porcupine(porcupine_access_key)
@@ -109,15 +114,6 @@ class ChatBot:
 
     self.setup_leds()
 
-  def is_button_pressed(self):
-    if GPIO is not None:
-      if GPIO.input(27) == 1:
-        return True
-      else:
-        return False
-    else:
-        return False
-
   def voice_detected(self):
     if (self.should_enable_voice_detection == True):
       return self.Mic_tuning.is_voice()
@@ -142,11 +138,12 @@ class ChatBot:
     is_detected_function_wakeword = len(detected_function_wakewords) > 0
     is_detected_heydoogle_wakeword = "hey_doogle" in detected_wakewords and len(detected_wakewords) == 1
 
-    if self.is_button_pressed() == True:
+    if self.is_button_pressed == True:
       self.log(f'Button pressed')
       self.prev_volume = self.current_volume
       detected_wakewords = ["hey_doogle"]
       is_detected_heydoogle_wakeword = True
+      self.is_button_pressed = False
 
     if is_detected_function_wakeword:
       function_wakeword = detected_function_wakewords[0]
@@ -224,17 +221,25 @@ class ChatBot:
     return (in_data, pyaudio.paContinue)
   
   def set_volume(self, volume):
+    if volume < 0:
+      volume = 0
+    if volume > 100:
+      volume = 100
+    
     if volume != self.current_volume:
-      subprocess.call(["amixer", "set", "Master", "--", str(volume)+"%"])
+      subprocess.call(["amixer", "set", "Master", "--", str(volume) + "%"])
+      subprocess.run(["ffplay", "-nodisp", "-autoexit", "sound/volume_check.wav"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
       self.current_volume = volume
   
   def play_audio(self, input, volume=100):
+    self.amplifier.unmute()
     self.should_enable_voice_detection = False
     if os.path.exists(input):
       subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
        subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     self.should_enable_voice_detection = True
+    self.amplifier.mute()
 
   def find_microphone_index(self, partial_name):
     pi = pyaudio.PyAudio()
@@ -675,6 +680,10 @@ class ChatBot:
       if len(lines) > 1000:
           with open('openwakeword.log', 'w') as log:
               log.writelines(lines[1:])
+
+  def handle_button_press(self):
+    self.is_button_pressed = True
+    print("Button pressed")
 
 chatbot = ChatBot()
 chatbot.start()

@@ -1,26 +1,12 @@
 from openwakeword.model import Model
 import numpy as np
 import os
-from dotenv import load_dotenv
-import logging
 
-logging.basicConfig(filename='openwakeword.log', level=logging.INFO, 
-  format='%(asctime)s %(levelname)s: %(message)s', 
-  datefmt='%m/%d/%Y %I:%M:%S %p')
-
-load_dotenv()
-
-debug = os.getenv('DOOGLE_DEBUG')
 openwakeword_sensitivity = float(os.getenv('OPENWAKEWORD_SENSITIVITY', 0.5))
 
-if os.path.isfile('chat.log'):
-  os.remove('chat.log')
-
 class OpenWakeWord:
-    def __init__(self):
+    def __init__(self): 
       model_paths = self.get_model_files("./wakeword/openwakeword/models")
-
-      self.log(f'Models: {model_paths}')
 
       self.model = Model(
         wakeword_models=model_paths,
@@ -32,8 +18,6 @@ class OpenWakeWord:
     # @return: list of wakewords detected sorted by score
     def detected(self, data):
       predictions = self.model.predict(np.frombuffer(data, dtype=np.int16))
-
-      self.log(f'Predictions: {predictions}')
 
       predictions_as_array = []
       for key, prediction in predictions.items():
@@ -64,13 +48,3 @@ class OpenWakeWord:
 
         return model_files
     
-    def log(self, message):
-      if debug:
-        logging.info(f'{message}')
-
-        with open('openwakeword.log', 'r') as log:
-            lines = log.readlines()
-
-        if len(lines) > 100:
-            with open('openwakeword.log', 'w') as log:
-                log.writelines(lines[1:])

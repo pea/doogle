@@ -5,6 +5,11 @@ import argparse
 import threading
 import time
 
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
+
+from amplifier import Amplifier
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--time', type=int, default=10)
 args = parser.parse_args()
@@ -29,13 +34,19 @@ def tts(text):
   subprocess.run(["ffplay", "-volume", "256", "-nodisp", "-autoexit", "-"], input=wavDataBytes, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def play_pause_media():
+  amplifier = Amplifier()
+  amplifier.unmute()
   try:
     subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", shell=True, executable="/bin/bash")
   except:
     pass
+  amplifier.mute()
 
 def play_alert():
+  amplifier = Amplifier()
+  amplifier.unmute()
   subprocess.run(["ffplay", "-volume", "256", "-nodisp", "-autoexit", 'sound/alarm.wav'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+  amplifier.mute()
 
 
 time_readable = ''
