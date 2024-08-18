@@ -73,7 +73,6 @@ class ChatBot:
     self.prev_volume = 80
     self.is_button_pressed = False
 
-    self.amplifier = Amplifier(callback=lambda muted, error: self.log(f"Amplifier muted: {muted}. Error: {error}"))
     self.rotary_encoder = RotaryEncoder(
       button_callback=lambda: self.handle_button_press(),
       rotation_callback=lambda rotation: self.set_volume(self.current_volume + (rotation * 5))
@@ -232,14 +231,17 @@ class ChatBot:
       self.current_volume = volume
   
   def play_audio(self, input, volume=100):
-    self.amplifier.unmute()
+    input_with_silent = os.path.join("sound/with_silent", os.path.basename(input))
+
+    if os.path.exists(input_with_silent):
+      input = input_with_silent
+
     self.should_enable_voice_detection = False
     if os.path.exists(input):
       subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
        subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     self.should_enable_voice_detection = True
-    self.amplifier.mute()
 
   def find_microphone_index(self, partial_name):
     pi = pyaudio.PyAudio()

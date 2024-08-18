@@ -74,7 +74,3 @@ Update `DOOGLE_DEBUG` in .env to toggle debugging. Logs are stored in chat.log a
 ## Rotary Encoder + Button
 
 A clickable rotary encoder can be used to control the volume of the speaker. The rotary encoder has 5 pins: GND, VCC, SW, CLK, and DT. VCC and GND are connected to the 5V and GND pins on the Raspberry PI. SW (button) is connected to GPIO pin 17, CLK is connected to GPIO pin 18, and DT is connected to GPIO pin 19. Clicking will wake Doogle (same as saying "Doogle") and rotating will adjust the volume. 
-
-## Amplifier Muting
-
-Doogle chat can mute the speaker when no audio is playing to make it completely silent during those times. The amplifier needs a terminal for muting, and this can be controlled via GPIO pin 6. A switching circuit will need to be bought or made to open or close the terminal.
