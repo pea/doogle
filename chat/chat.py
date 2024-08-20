@@ -26,6 +26,7 @@ from wakeword.openwakeword.openwakeword import OpenWakeWord
 from wakeword.porcupine.porcupine import Porcupine
 from amplifier import Amplifier
 from rotary_encoder import RotaryEncoder
+import threading
 
 load_dotenv()
 
@@ -86,7 +87,7 @@ class ChatBot:
     else:
       self.wakeword = OpenWakeWord()
 
-    self.set_volume(80)
+    self.set_volume(80, False)
 
     try:
       self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
@@ -119,17 +120,21 @@ class ChatBot:
     else:
       return False
 
-  def stream_callback(self, in_data, frame_count, time_info, status):
-    new_data = np.frombuffer(in_data, dtype=np.int16)
+  # Channel 0: processed audio for ASR
+  # Channel 1: mic1 raw data
+  # Channel 2: mic2 raw data
+  # Channel 3: mic3 raw data
+  # Channel 4: mic4 raw data
+  # Channel 5: merged playback data
+  def extract_channel(self, data, channel):
+    new_data = np.frombuffer(data, dtype=np.int16)
     data_np = np.reshape(new_data, (-1, 6))  # Corrected line
-    data_channel_0 = np.ascontiguousarray(data_np[:, 0])
-    data_channel_1 = np.ascontiguousarray(data_np[:, 1])
-    data_channel_2 = np.ascontiguousarray(data_np[:, 2])
-    data_channel_3 = np.ascontiguousarray(data_np[:, 3])
-    data_channel_4 = np.ascontiguousarray(data_np[:, 4])
-    data_channel_5 = np.ascontiguousarray(data_np[:, 5])
+    # data_channel_0/1/2/3/4/5 = np.ascontiguousarray(data_np[:, 0/1/2/3/4/5])
+    data_channel = np.ascontiguousarray(data_np[:, channel])
+    return data_channel
 
-    data = data_channel_1
+  def stream_callback(self, in_data, frame_count, time_info, status):
+    data = self.extract_channel(in_data, 0)
 
     detected_wakewords = self.wakeword.detected(data)
 
@@ -172,7 +177,7 @@ class ChatBot:
           self.play_audio("sound/close.wav", 70)
           self.reset_leds()
           threading.Thread(target=self.handle_recording).start()
-          threading.Thread(target=self.resume_media).start()
+          self.resume_media()
           self.should_record = False
           self.is_recording = False
           self.time_started_recording = 0
@@ -194,17 +199,17 @@ class ChatBot:
       if self.time_started_recording == 0:
         self.time_started_recording = time.time()
 
-      threading.Thread(target=self.pause_media).start()
+      self.pause_media()
       if self.recording is None:
-          self.recording = data_channel_0
+          self.recording = data
       else:
-        self.recording = np.concatenate((self.recording, data_channel_0))
+        self.recording = np.concatenate((self.recording, data))
 
     if self.is_recording and time.time() - self.time_started_recording > 10:
       self.log(f'User spoke for over 10 seconds, stopping recording')
       self.play_audio("sound/close.wav", 70)
       threading.Thread(target=self.handle_recording).start()
-      threading.Thread(target=self.resume_media).start()
+      self.resume_media()
       self.should_record = False
       self.is_recording = False
       self.time_started_recording = 0
@@ -219,7 +224,7 @@ class ChatBot:
 
     return (in_data, pyaudio.paContinue)
   
-  def set_volume(self, volume):
+  def set_volume(self, volume, audio_confirmation=True):
     if volume < 0:
       volume = 0
     if volume > 100:
@@ -227,7 +232,8 @@ class ChatBot:
     
     if volume != self.current_volume:
       subprocess.call(["amixer", "set", "Master", "--", str(volume) + "%"])
-      subprocess.run(["ffplay", "-nodisp", "-autoexit", "sound/volume_check.wav"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+      if audio_confirmation:
+        self.play_audio("sound/volume.wav", 50)
       self.current_volume = volume
   
   def play_audio(self, input, volume=100):
@@ -563,10 +569,13 @@ class ChatBot:
       if self.media_paused:
         return
 
-      try:
-        subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", shell=True, executable="/bin/bash")
-      except:
-        pass
+      def pause_media_thread():
+        try:
+          subprocess.run("echo 'pause' > /dev/tcp/localhost/12345", shell=True, executable="/bin/bash")
+        except:
+          pass
+
+      threading.Thread(target=pause_media_thread).start()
 
       self.media_paused = True
       
@@ -574,10 +583,13 @@ class ChatBot:
       if not self.media_paused:
         return
 
-      try:
-        subprocess.run("echo 'play' > /dev/tcp/localhost/12345", shell=True, executable="/bin/bash")
-      except:
-        pass
+      def resume_media_thread():
+        try:
+          subprocess.run("echo 'play' > /dev/tcp/localhost/12345", shell=True, executable="/bin/bash")
+        except:
+          pass
+      
+      threading.Thread(target=resume_media_thread).start()
       
       self.media_paused = False
 
