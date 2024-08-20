@@ -76,6 +76,7 @@ class ChatBot:
 
     self.rotary_encoder = RotaryEncoder(
       button_callback=lambda: self.handle_button_press(),
+      long_press_callback=lambda: self.stop_media(),
       rotation_callback=lambda rotation: self.set_volume(self.current_volume + (rotation * 5))
     )
 
@@ -143,7 +144,6 @@ class ChatBot:
     is_detected_heydoogle_wakeword = "hey_doogle" in detected_wakewords and len(detected_wakewords) == 1
 
     if self.is_button_pressed == True:
-      self.log(f'Button pressed')
       self.prev_volume = self.current_volume
       detected_wakewords = ["hey_doogle"]
       is_detected_heydoogle_wakeword = True
@@ -233,17 +233,17 @@ class ChatBot:
     if volume != self.current_volume:
       subprocess.call(["amixer", "set", "Master", "--", str(volume) + "%"])
       if audio_confirmation:
-        self.play_audio("sound/volume.wav", 50)
+        self.play_audio("sound/volume_check.wav", 50)
       self.current_volume = volume
   
   def play_audio(self, input, volume=100):
-    input_with_silent = os.path.join("sound/with_silent", os.path.basename(input))
-
-    if os.path.exists(input_with_silent):
-      input = input_with_silent
-
     self.should_enable_voice_detection = False
     if os.path.exists(input):
+      input_with_silent = os.path.join("sound/with_silent", os.path.basename(input))
+
+      if os.path.exists(input_with_silent):
+        input = input_with_silent
+
       subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", input], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
        subprocess.run(["ffplay", "-volume", str(volume), "-nodisp", "-autoexit", "-"], input=input, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -593,6 +593,10 @@ class ChatBot:
       
       self.media_paused = False
 
+  def stop_media(self):
+    subprocess.run(["pkill", "vlc"])
+    subprocess.run(["pkill", "VLC"])
+
   def tts(self, text):
     data = {
       'text': text
@@ -696,6 +700,7 @@ class ChatBot:
               log.writelines(lines[1:])
 
   def handle_button_press(self):
+    self.log(f'Button pressed')
     self.is_button_pressed = True
 
 chatbot = ChatBot()
