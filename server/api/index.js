@@ -78,8 +78,8 @@ app.post('/chat', upload, async (req, res) => {
 
       const text = await llamaRequest({
         text: inputText,
-        history,
-        grammar,
+        history: history,
+        grammar: grammar,
         image: base64Image ?? undefined,
         imageId: imageId
       })
@@ -94,17 +94,20 @@ app.post('/chat', upload, async (req, res) => {
         }
 
         if (retryCount >= maxRetries) {
+          console.error('Max retries reached')
           return null
         }
 
         const jsonResponse = parsedJson();
 
         if (!jsonResponse) {
+          console.error('Invalid JSON response')
           retryCount++;
           return getLlamaText()
         }
 
         if (jsonResponse?.function === undefined) {
+          console.error('Function is undefined')
           retryCount++;
           return getLlamaText()
         }
@@ -205,17 +208,15 @@ function sttRequest(fileBuffer) {
 async function llamaRequest({text, image, imageId, history, grammar}) {
   const prompt = history + '\nUser: ' + text + '\nDoogle:';
 
-  console.log(imageId)
-
   const data = {
     'stream': false,
-    'n_predict': 400,
+    'n_predict': 100,
     'temperature': 0.1,
     'stop': ['</s>', 'Doogle:', 'User:'],
     'repeat_last_n': 256,
     'repeat_penalty': 1.18,
-    'top_k': 40,
-    'top_p': 0.95,
+    'top_k': 20,
+    'top_p': 0.9,
     'min_p': 0.05,
     'tfs_z': 1,
     'typical_p': 1,
@@ -233,12 +234,16 @@ async function llamaRequest({text, image, imageId, history, grammar}) {
     'prompt': prompt
   };
 
+  console.log(grammar)
+
   const response = await axios.post('http://llamacpp:7000/completion', data, {
     headers: {
       'Accept': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Content-Type': 'application/json',
     },
+  }).catch(error => {
+    console.log(JSON.stringify(error, null, 2));
   })
 
   return response.data.content

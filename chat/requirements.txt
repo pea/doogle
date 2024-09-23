@@ -11,3 +11,4 @@ RPi.GPIO
 python-dotenv
 pvporcupine
 psutil
+pydub

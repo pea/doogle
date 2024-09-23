@@ -1,4 +1,4 @@
-.PHONY: install
+.PHONY: install install-python
 
 configure-autologin:
 	@echo "Configuring autologin timeout..."
