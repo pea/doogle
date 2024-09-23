@@ -28,6 +28,7 @@ from amplifier import Amplifier
 from rotary_encoder import RotaryEncoder
 import threading
 from pydub import AudioSegment
+from logger import CustomLogger
 
 load_dotenv()
 
@@ -40,23 +41,22 @@ porcupine_access_key = os.getenv("PORCUPINE_ACCESS_KEY")
 conversation_mode = os.getenv("CONVERSATION_MODE")
 
 try:
-    import RPi.GPIO as GPIO
-    from respeaker.pixel_ring.pixel_ring import pixel_ring
-    from respeaker.tuning import Tuning
+  import RPi.GPIO as GPIO
+  from respeaker.pixel_ring.pixel_ring import pixel_ring
+  from respeaker.tuning import Tuning
 except ImportError:
-    GPIO = None
-    pixel_ring = None
-    Tuning = None
+  GPIO = None
+  pixel_ring = None
+  Tuning = None
 
 
 class ChatBot:
     def __init__(self):
-        logging.basicConfig(
-            filename="chat.log",
-            level=logging.INFO,
-            format="%(asctime)s %(levelname)s: %(message)s",
-            datefmt="%m/%d/%Y %I:%M:%S %p",
-        )
+        self.logger = CustomLogger()
+
+        # empty debug.log and history.log
+        open("debug.log", "w").close()
+        open("history.log", "w").close()
 
         self.CHUNK = 1020
         self.RATE = 16000
@@ -100,6 +100,8 @@ class ChatBot:
 
         self.set_volume(80, False)
 
+        self.logger.history("Chatbot started")
+
         try:
             self.mic_instance = usb.core.find(idVendor=0x2886, idProduct=0x0018)
             self.Mic_tuning = Tuning(self.mic_instance)
@@ -110,7 +112,7 @@ class ChatBot:
             # self.Mic_tuning.write('AGCTIME', 0.1)
             # self.Mic_tuning.write('AGCDESIREDLEVEL', 10)
 
-            self.log(
+            self.logger.debug(
                 f"""
       GAMMAVAD_SR: {self.Mic_tuning.read("GAMMAVAD_SR")}
       AGCONOFF: {self.Mic_tuning.read("AGCONOFF")}
@@ -157,7 +159,7 @@ class ChatBot:
 
         # If Doogle is speaking or some other audio is playing, don't record audio
         if self.is_audio_playing():
-            self.log("Audio is playing, not recording")
+            self.logger.debug("Audio is playing, not recording")
             return (None, pyaudio.paContinue)
 
         detected_wakewords = self.wakeword.detected(data)
@@ -182,18 +184,18 @@ class ChatBot:
             function_wakeword = detected_function_wakewords[0]
             run_function(function_wakeword)
 
-        if self.voice_detected():
+        if self.voice_detected() or self.is_button_pressed:
             voice_detected = True
         else:
             voice_detected = False
 
         if voice_detected:
             self.time_last_voice_detected = time.time()
-            self.log(f"Voice detected")
+            self.logger.debug(f"Voice detected")
         else:
             if time.time() - self.time_last_voice_detected > self.seconds_wait_speak:
                 if self.recording is not None and self.is_recording:
-                    self.log(
+                    self.logger.debug(
                         f"Voice not detected for {self.seconds_wait_speak} seconds while recording, stopping recording"
                     )
                     self.play_audio("sound/close.wav", 70)
@@ -207,17 +209,19 @@ class ChatBot:
         if is_detected_heydoogle_wakeword:
             self.should_record = True
             self.time_last_voice_detected = time.time()
-            self.seconds_wait_speak = 3
-            self.log(f"Hey Doogle wakeword detected")
+            self.seconds_wait_speak = 5
+            self.logger.debug(f"Hey Doogle wakeword detected")
 
         if self.should_record:
             if not self.is_recording:
                 self.pause_media()
                 self.play_audio("sound/open.wav", 70)
-                self.listen_leds()
+
+                if not self.is_audio_playing():
+                  self.listen_leds()
 
             self.is_recording = True
-            self.log(f"Recording in progress")
+            self.logger.debug(f"Recording in progress")
 
             if self.time_started_recording == 0:
                 self.time_started_recording = time.time()
@@ -228,7 +232,7 @@ class ChatBot:
                 self.recording = np.concatenate((self.recording, data))
 
         if self.is_recording and time.time() - self.time_started_recording > 10:
-            self.log(f"User spoke for over 10 seconds, stopping recording")
+            self.logger.debug(f"User spoke for over 10 seconds, stopping recording")
             self.play_audio("sound/close.wav", 70)
             threading.Thread(target=self.handle_recording).start()
             self.resume_media()
@@ -242,7 +246,7 @@ class ChatBot:
             and time.time() - self.time_last_response > 20
             and not self.is_recording
         ):
-            self.log(f"No response for 20 seconds, resetting history")
+            self.logger.debug(f"No response for 20 seconds, resetting history")
             self.time_last_response = 0
             self.history = prompt()
             self.play_audio("sound/reset.wav", 70)
@@ -298,7 +302,7 @@ class ChatBot:
         with self.is_playing_audio_lock:
             return self.is_playing_audio
 
-    def play_audio(self, input, volume=100):
+    def play_audio(self, input, volume=100, is_speech=False):
         if os.path.exists(input):
             input_abs_path = os.path.abspath(input)
             duration = self.get_audio_file_duration(input_abs_path)
@@ -306,7 +310,6 @@ class ChatBot:
             input_with_silent = os.path.join(
                 "sound/with_silent", os.path.basename(input)
             )
-
 
             if os.path.exists(input_with_silent):
                 input_with_silent_abs_path = os.path.abspath(input_with_silent)
@@ -331,8 +334,10 @@ class ChatBot:
                 )
             ).start()
 
-        self.log(f"Playing audio for {duration} seconds")
-        self.set_playing_audio_for_duration(duration)
+        self.logger.debug(f"Playing audio for {duration} seconds")
+
+        if is_speech:
+          self.set_playing_audio_for_duration(duration)
 
     def find_microphone_index(self, partial_name):
         pi = pyaudio.PyAudio()
@@ -431,7 +436,7 @@ class ChatBot:
 
     def llm_request(self, recording=None, text=None):
         if recording is not None and text is not None:
-            self.log("No audio or text provided")
+            self.logger.debug("No audio or text provided")
             self.reset_leds()
             self.time_last_response = time.time()
             return
@@ -448,6 +453,10 @@ class ChatBot:
 
             userStt = self.sst(recording_wav)
 
+            trimed_stt = self.trim_stt(userStt)
+            
+            self.logger.history(f"User: {trimed_stt}")
+
             self.colour_leds("cyan")
 
             if userStt is None or self.trim_stt(userStt) == "":
@@ -458,13 +467,13 @@ class ChatBot:
 
             new_prompt = prompt(userText=userStt, history=self.history)
 
-            self.log(f"History: {self.history}")
+            self.logger.debug(f"History: {self.history}")
 
-            self.log(f"User STT: {userStt}")
+            self.logger.debug(f"User STT: {userStt}")
 
             numTriggerWordsDetected = len(trigger_words_detected(userStt))
 
-            self.log(
+            self.logger.debug(
                 f"Trigger words detected: {str(numTriggerWordsDetected)} from text {userStt}"
             )
 
@@ -475,9 +484,11 @@ class ChatBot:
 
             data = {"text": userStt, "history": new_prompt, "grammar": grammar}
 
-            self.log(data)
+            self.logger.debug(data)
 
             self.colour_leds("green")
+
+            response = None
 
             try:
                 response = requests.post(
@@ -486,15 +497,19 @@ class ChatBot:
                     json=data,
                     timeout=15,
                 )
-            except:
-                self.log(
-                    f"""
-        Headers: {response.headers}
-        Status code: {response.status_code}
-        Body: {response.text}
-        Request: {response.request.body}
-        """
-                )
+            except requests.RequestException as e:
+                if response is not None:
+                  self.logger.debug(
+                      f"""
+          Headers: {response.headers}
+          Status code: {response.status_code}
+          Body: {response.text}
+          Request: {response.request.body}
+          """
+                  )
+
+                else:
+                    self.logger.debug(f"Exception: {str(e)}")
                 self.play_audio("sound/error.wav", 50)
 
             self.colour_leds("cyan")
@@ -504,7 +519,7 @@ class ChatBot:
         if text is not None:
             data = {"text": text, "history": prompt(), "grammar": ""}
 
-            self.log(data)
+            self.logger.debug(data)
 
             self.loading_leds()
 
@@ -518,7 +533,7 @@ class ChatBot:
                     timeout=15,
                 )
             except:
-                self.log(
+                self.logger.debug(
                     f"""
         Headers: {response.headers}
         Status code: {response.status_code}
@@ -535,7 +550,7 @@ class ChatBot:
         if response.status_code != 200:
             self.tts("There was an error with a request. " + response.text)
             self.reset_leds()
-            self.log(
+            self.logger.debug(
                 f"""
       Headers: {response.headers}
       Status code: {response.status_code}
@@ -555,7 +570,7 @@ class ChatBot:
         if debug:
             debug_response = response_json.copy()
             debug_response["wavData"] = "WAV DATA"
-            self.log(debug_response)
+            self.logger.debug(debug_response)
 
         llamaText = response_json["llamaText"]
 
@@ -576,7 +591,7 @@ class ChatBot:
         except:
             self.tts("There was an error with a request. " + response.text)
             self.reset_leds()
-            self.log(
+            self.logger.debug(
                 f"""
       Headers: {response.headers}
       Status code: {response.status_code}
@@ -585,11 +600,13 @@ class ChatBot:
       """
             )
             return None
+        
+        self.logger.history(f"Doogle: {message}")
 
         return (message, sttText, wavDataBytes, function, option)
 
     def handle_function(self, function, option):
-        self.log(f"Running function {function} with option {option}")
+        self.logger.debug(f"Running function {function} with option {option}")
 
         run_function(function, option)
 
@@ -615,7 +632,7 @@ class ChatBot:
         if self.trim_stt(sttText) is not "":
             self.history += "\n\nUser: " + sttText + "\nDoogle: " + message
             self.pause_media()
-            self.play_audio(wavDataBytes)
+            self.play_audio(input=wavDataBytes, is_speech=True)
             self.resume_media()
 
     def start_listening(self):
@@ -627,7 +644,7 @@ class ChatBot:
 
     def handle_recording(self):
         if self.recording is None:
-            self.log("Recording is empty")
+            self.logger.debug("Recording is empty")
             self.time_last_response = time.time()
             self.reset_leds()
             return
@@ -638,7 +655,7 @@ class ChatBot:
 
         if llm_response is None:
             self.reset_leds()
-            self.log("LLM response is missing")
+            self.logger.debug("LLM response is missing")
             self.time_last_response = time.time()
             return
 
@@ -648,18 +665,18 @@ class ChatBot:
 
         if function != "None" and function != "none":
             functionObj = get_function(function)
-            self.log(f"Function object: {functionObj}")
+            self.logger.debug(f"Function object: {functionObj}")
             if functionObj["type"] == "command":
                 self.handle_function(function, option)
                 return
             elif functionObj["type"] == "environment":
                 self.pause_media()
-                self.play_audio(wavDataBytes)
+                self.play_audio(input=wavDataBytes, is_speech=True)
                 self.resume_media()
                 return
         else:
             self.pause_media()
-            self.play_audio(wavDataBytes)
+            self.play_audio(input=wavDataBytes, is_speech=True)
             self.time_last_response = time.time()
             self.reset_leds()
             self.start_listening()
@@ -722,11 +739,15 @@ class ChatBot:
         wavDataBytes = base64.b64decode(wavData)
 
         self.pause_media()
-        self.play_audio(wavDataBytes)
+        self.play_audio(input=wavDataBytes, is_speech=True)
         self.resume_media()
 
     def sst(self, wavDataBytes):
         files = {"file": wavDataBytes}
+
+        self.logger.debug("Sending audio to SST server")
+
+        response = None
 
         try:
             response = requests.post(
@@ -735,19 +756,18 @@ class ChatBot:
                 files=files,
                 timeout=15,
             )
-        except:
+        except requests.RequestException as e:
+            self.logger.debug("Error sending audio to SST server")
+            if response is not None:
+                self.logger.debug("SST status code: " + str(response.status_code))
+                self.logger.debug("SST response: " + response.text)
+            else:
+                self.logger.debug(f"Exception: {str(e)}")
+            
             self.reset_leds()
             self.play_audio("sound/error.wav", 50)
             if response.text is not None:
                 self.tts(response.text)
-            self.log(
-                f"""
-      Headers: {response.headers}
-      Status code: {response.status_code}
-      Body: {response.text}
-      Request: {response.request.body}
-      """
-            )
             return
 
         responseJson = json.loads(response.text)
@@ -791,10 +811,8 @@ class ChatBot:
         else:
             return 0x000000
 
-    def log(self, message):
+    def log(self, message, type="debug"):
         if debug:
-            logging.info(f"{message}")
-
             with open("openwakeword.log", "r") as log:
                 lines = log.readlines()
 
@@ -803,7 +821,7 @@ class ChatBot:
                     log.writelines(lines[1:])
 
     def handle_button_press(self):
-        self.log(f"Button pressed")
+        self.logger.debug(f"Button pressed")
         self.is_button_pressed = True
 
 
